@@ -3,3 +3,4 @@ obj/
 # Se vuoi evitare di versionare la chiave in repository Git,
 # escludi il file licenza oppure sostituiscilo localmente.
 wwwroot/js/devextreme-license.js
+/.vs/Molina.Bedding.Mvc/FileContentIndex
