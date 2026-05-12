@@ -1,0 +1,29 @@
+@{
+    var startSuccessMessage = TempData["StartSuccessMessage"] as string;
+}
+
+@{
+    ViewData["Title"] = "Schermata 0 - Inizio operazione";
+}
+
+<section class="page-section page-section--narrow">
+    <div class="start-card">
+        <div class="page-kicker">Schermata 0</div>
+        <h1>Inizia operazione</h1>
+        <p class="page-intro page-intro--center">
+            Quando sei pronto, premi il pulsante qui sotto.
+        </p>
+
+        <form asp-action="StartOperation" asp-controller="ProductionDeclaration" method="post" class="start-form">
+            @Html.AntiForgeryToken()
+            <button type="submit" id="startOperationButton" class="start-operation-button">
+                Inizia operazione
+            </button>
+        </form>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(startSuccessMessage))
+{
+    <div data-start-success-message="@startSuccessMessage"></div>
+}

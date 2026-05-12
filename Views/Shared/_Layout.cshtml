@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Molina Bedding</title>
+
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <link rel="preconnect" href="https://code.jquery.com" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/devextreme-dist/25.2.5/css/dx.light.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/devextreme-dist/25.2.5/js/dx.all.js"></script>
+    <script src="~/js/devextreme-license.js" asp-append-version="true"></script>
+</head>
+<body class="app-shell">
+    @{
+        var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+        var showSidebarReset = currentAction == "Operators"
+            || currentAction == "WorkMenu"
+            || currentAction == "Launches"
+            || currentAction == "Screen4";
+    }
+    <div class="app-frame">
+        <aside class="app-sidebar">
+            <div class="brand-block">
+                <div class="brand-mark">M</div>
+                <div>
+                    <div class="brand-title">Molina Bedding</div>
+                    <div class="brand-subtitle">Dichiarazione produzione</div>
+                </div>
+            </div>
+
+            <nav class="stepper-nav" aria-label="Avanzamento schermate">
+                <div class="stepper-item @(currentAction == "Start" ? "is-current" : "is-complete")">
+                    <span class="stepper-index">0</span>
+                    <div>
+                        <div class="stepper-title">Inizio</div>
+                    </div>
+                </div>
+                <div class="stepper-item @(currentAction == "Operators" ? "is-current" : (currentAction == "Start" ? string.Empty : "is-complete"))">
+                    <span class="stepper-index">1</span>
+                    <div>
+                        <div class="stepper-title">Operatori</div>
+                    </div>
+                </div>
+                <div class="stepper-item @(currentAction == "WorkMenu" ? "is-current" : ((currentAction == "Launches" || currentAction == "Screen4") ? "is-complete" : string.Empty))">
+                    <span class="stepper-index">2</span>
+                    <div>
+                        <div class="stepper-title">Lavorazione</div>
+                    </div>
+                </div>
+                <div class="stepper-item @(currentAction == "Launches" ? "is-current" : string.Empty)">
+                    <span class="stepper-index">3</span>
+                    <div>
+                        <div class="stepper-title">Lotti</div>
+                    </div>
+                </div>
+                <div class="stepper-item @(currentAction == "Screen4" ? "is-current" : string.Empty)">
+                    <span class="stepper-index">4</span>
+                    <div>
+                        <div class="stepper-title">Operazione</div>
+                    </div>
+                </div>
+            </nav>
+
+            @if (showSidebarReset)
+            {
+                <form asp-action="Reset" asp-controller="ProductionDeclaration" method="post" class="sidebar-reset-form">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="sidebar-reset-button">Reset</button>
+                </form>
+            }
+        </aside>
+
+        <main class="app-main" role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <div id="globalToast" class="fallback-toast" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="~/js/production-declaration.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

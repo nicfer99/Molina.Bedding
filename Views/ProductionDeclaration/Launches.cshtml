@@ -1,0 +1,301 @@
+@model ProductionLaunchSelectionViewModel
+@{
+    ViewData["Title"] = "Schermata 3 - Selezione lotto";
+    var selectedIds = Model.SelectedOrderIds
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var canContinue = selectedIds.Count > 0 && Model.Launches.Count > 0;
+    var productionModeText = Model.ProductionMode switch
+    {
+        "riempimento" => "Riempimento",
+        "macchina" => "Macchina",
+        _ => string.Empty
+    };
+}
+
+<section class="page-section page-section--wide page-section--launches"
+         data-launches-page="true"
+         data-direct-requires-material-lot-selection="@Model.RequiresMaterialLotSelection.ToString().ToLowerInvariant()">
+    <header class="page-header page-header--compact page-header--workmenu">
+        <div>
+            <div class="page-kicker">Schermata 3</div>
+            <h1>Selezione lotto</h1>
+            <p class="page-intro">
+                @Model.AreaTitle - @Model.ActionText@if (!string.IsNullOrWhiteSpace(productionModeText))
+                {
+                    <text> - @productionModeText</text>
+                }
+            </p>
+        </div>
+        <div class="selected-operators-panel" aria-label="Operatori selezionati">
+            <div class="selected-operators-head">
+                <span class="note-label">Operatori selezionati</span>
+                <strong>@Model.SelectedOperators.Count</strong>
+            </div>
+            <div class="selected-operators-list">
+                @foreach (var operatorItem in Model.SelectedOperators)
+                {
+                    <span class="selected-operator-chip">@operatorItem.Name</span>
+                }
+            </div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+    {
+        <div class="inline-alert inline-alert--success" role="status">
+            @Model.SuccessMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ValidationMessage))
+    {
+        <div class="inline-alert" role="alert">
+            @Model.ValidationMessage
+        </div>
+    }
+
+    <form asp-action="Screen4FromLaunches" asp-controller="ProductionDeclaration" method="post" id="launchSelectionForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="ActionId" value="@Model.ActionId" />
+        <input type="hidden" name="SelectedOrderIds" id="SelectedOrderIds" value="@Model.SelectedOrderIds" />
+        <input type="hidden" name="ProductionMode" value="@Model.ProductionMode" />
+        <input type="hidden" name="AutoInsertOnBarcodeEnabled" id="AutoInsertOnBarcodeEnabled" value="@(Model.AutoInsertOnBarcodeEnabled ? "true" : "false")" />
+        <input type="hidden" name="AutoFillMaxOnBarcode" id="AutoFillMaxOnBarcode" value="false" />
+        <input type="hidden" name="PrefilledSelectionsJson" id="PrefilledSelectionsJson" value="@Model.PrefilledSelectionsJson" />
+
+        <div class="barcode-panel">
+            <label for="lotBarcode" class="barcode-label">Barcode lotto</label>
+            <input type="text" id="lotBarcode" class="barcode-input" autocomplete="off" inputmode="text" />
+        </div>
+
+        <div class="launch-toggle-panel">
+            <label class="launch-toggle-switch" for="autoInsertOnBarcodeToggle">
+                <input type="checkbox" id="autoInsertOnBarcodeToggle" @(Model.AutoInsertOnBarcodeEnabled ? "checked" : null) />
+                <span class="launch-toggle-switch__track"></span>
+                <span class="launch-toggle-switch__label">Attiva inserimento diretto quando scannerizzo il barcode</span>
+            </label>
+        </div>
+
+        <div class="launch-grid" aria-label="Lotti disponibili">
+            @foreach (var launch in Model.Launches)
+            {
+                var isSelected = selectedIds.Contains(launch.OrderId.ToString());
+                var producedValue = launch.QuantityProduced ?? 0m;
+                var remainingValue = Math.Max(launch.QuantityToProduce - producedValue, 0m);
+                var launchMaterialLotsJson = System.Text.Json.JsonSerializer.Serialize(launch.AvailableMaterialLots ?? new List<string>());
+                var launchMaterialLotsBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(launchMaterialLotsJson));
+                <article
+                    class="launch-card@(isSelected ? " is-selected" : string.Empty)"
+                    data-order-id="@launch.OrderId"
+                    data-lot-code="@launch.LotCode"
+                    data-max-qty="@launch.QuantityToProduce.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                    data-produced-qty="@producedValue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                    data-remaining-qty="@remainingValue.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                    data-material-lots-base64="@launchMaterialLotsBase64"
+                    data-material-lot-error="@launch.MaterialLotValidationMessage"
+                    aria-pressed="@(isSelected ? "true" : "false")">
+                    <button type="button"
+                            class="launch-card-remove"
+                            data-order-id="@launch.OrderId"
+                            aria-label="Togli questo lotto dalla selezione"
+                            title="Togli dalla selezione">
+                        ×
+                    </button>
+                    <span class="launch-card-code">@launch.LotCode</span>
+                    <span class="launch-card-doc-number">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? $"Doc. {launch.DocumentNumber}" : string.Empty)</span>
+                    <span class="launch-card-fields">
+                        <span class="launch-field">
+                            <span class="launch-field-label">Qta da produrre</span>
+                            <span class="launch-field-value">@launch.QuantityToProduce.ToString("0.##")</span>
+                        </span>
+                        <span class="launch-field">
+                            <span class="launch-field-label">Qta prodotta</span>
+                            <span class="launch-field-value@(launch.QuantityProduced.GetValueOrDefault() > 0 ? " launch-field-value--produced" : string.Empty)">@(launch.QuantityProduced?.ToString("0.##") ?? "0")</span>
+                        </span>
+                    </span>
+                    <div class="launch-card-direct-summary is-hidden" data-launch-prefill-summary="true">
+                        <div class="launch-card-direct-summary__row">
+                            <span class="note-label">Qta impostata</span>
+                            <strong data-launch-prefill-qty="true">-</strong>
+                        </div>
+                        @if (Model.RequiresMaterialLotSelection)
+                        {
+                            <div class="launch-card-direct-summary__row">
+                                <span class="note-label">Lotto</span>
+                                <button type="button"
+                                        class="launch-card-direct-summary__lot-button"
+                                        data-open-launch-direct-modal="true"
+                                        aria-label="Modifica il lotto selezionato in Schermata 3">
+                                    <span data-launch-prefill-lot="true">Nessun lotto selezionato</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+
+        <div class="form-footer form-footer--split">
+            <a asp-action="WorkMenu" asp-controller="ProductionDeclaration" class="secondary-action-link">
+                Indietro
+            </a>
+            <button type="submit" id="launchContinueButton" class="primary-action-button launch-continue-button" @(!canContinue ? "disabled" : null)>
+                Avanti
+            </button>
+        </div>
+    </form>
+</section>
+
+<div class="screen4-qty-modal" id="launchDirectInsertModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-launch-direct-modal="true"></div>
+    <div class="screen4-qty-modal__dialog launch-direct-modal" role="dialog" aria-modal="true" aria-labelledby="launchDirectInsertModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Schermata 3</div>
+                <h2 id="launchDirectInsertModalTitle">Dati da riportare in Schermata 4</h2>
+                <div class="screen4-modal-lot" data-launch-direct-lot="true">-</div>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-launch-direct-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-qty-modal__content launch-direct-modal__content">
+            <div class="launch-direct-modal__sections@(Model.RequiresMaterialLotSelection ? string.Empty : " launch-direct-modal__sections--single")">
+                <section class="launch-direct-panel launch-direct-panel--quantity" aria-label="Sezione quantità">
+                    <div class="launch-direct-panel__header launch-direct-panel__header--stacked">
+                        <div>
+                            <div class="page-kicker">Quantità</div>
+                            <strong class="launch-direct-panel__title">Imposta la quantità dichiarata</strong>
+                            <p class="screen4-qty-modal__intro launch-direct-panel__intro">Scegli se usare la qta massima residua oppure una qta parziale.</p>
+                        </div>
+                    </div>
+
+                    <div class="screen4-qty-modal__info">
+                        <div class="screen4-qty-modal__info-box">
+                            <span class="note-label">Qta residua</span>
+                            <strong data-launch-direct-max="true">0</strong>
+                        </div>
+                        <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
+                            <span class="note-label">Qta impostata</span>
+                            <strong data-launch-direct-qty-display="true">0</strong>
+                        </div>
+                    </div>
+
+                    <div class="launch-direct-qty-actions" aria-label="Scelta quantità">
+                        <button type="button" class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action" data-launch-direct-set-max="true">
+                            Max
+                        </button>
+                        <button type="button" class="screen4-slot-button screen4-slot-button--partial launch-direct-qty-action" data-launch-direct-open-partial="true">
+                            Qta Parziale
+                        </button>
+                    </div>
+
+                </section>
+
+                @if (Model.RequiresMaterialLotSelection)
+                {
+                    <section class="launch-direct-panel launch-direct-panel--lot" aria-label="Sezione lotto">
+                        <div class="launch-direct-panel__header launch-direct-panel__header--stacked">
+                            <div>
+                                <div class="page-kicker">Lotto</div>
+                                <strong class="launch-direct-panel__title" data-launch-direct-material-lot-display="true">Nessun lotto selezionato</strong>
+                                <p class="screen4-qty-modal__intro launch-direct-panel__intro">Seleziona il lotto materiale prima di proseguire in Schermata 4.</p>
+                            </div>
+                        </div>
+                        <div class="launch-direct-material-lot-panel">
+                            <input type="hidden" id="launchDirectMaterialLotInput" value="" />
+                            <div class="material-lot-scan-help" data-launch-direct-material-lot-help="true">
+                                Seleziona il lotto toccando uno dei lotti disponibili.
+                            </div>
+                            <div class="material-lot-reference-list" data-launch-direct-material-lot-list="true" aria-label="Lotti disponibili"></div>
+                        </div>
+                    </section>
+                }
+            </div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-close-launch-direct-modal="true">
+                Chiudi
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-launch-direct-insert="true">
+                    Conferma dati
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="screen4-qty-modal" id="launchDirectPartialQuantityModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-launch-direct-partial-modal="true"></div>
+    <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="launchDirectPartialQuantityModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Quantità parziale</div>
+                <h2 id="launchDirectPartialQuantityModalTitle">Inserisci la quantità dichiarata</h2>
+                <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata per il lotto selezionato. Se supera il residuo disponibile, ti verrà chiesta una conferma dedicata.</p>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-launch-direct-partial-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-qty-modal__content">
+            <div class="screen4-qty-modal__info">
+                <div class="screen4-qty-modal__info-box">
+                    <span class="note-label" id="launchDirectPartialQtyModalReferenceLabel">Qta residua</span>
+                    <strong id="launchDirectPartialQtyModalMax">0</strong>
+                </div>
+                <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
+                    <span class="note-label">Qta dichiarata</span>
+                    <strong id="launchDirectPartialQtyModalDisplay">0</strong>
+                </div>
+            </div>
+
+            <div class="screen4-qty-keypad">
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="1">1</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="2">2</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="3">3</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="4">4</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="5">5</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="6">6</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="7">7</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="8">8</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="9">9</button>
+                <button type="button" class="screen4-qty-key screen4-qty-key--secondary" data-launch-direct-partial-keypad-action="clear">C</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value="0">0</button>
+                <button type="button" class="screen4-qty-key screen4-qty-key--secondary" data-launch-direct-partial-keypad-action="backspace">⌫</button>
+                <button type="button" class="screen4-qty-key" data-launch-direct-partial-keypad-value=",">,</button>
+            </div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-launch-direct-partial="true">
+                Annulla qta dichiarata
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-launch-direct-partial-modal="true">
+                    Chiudi
+                </button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-launch-direct-partial="true">
+                    Conferma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        window.molinaLaunchesPage = {
+            hasValidationMessage: @(!string.IsNullOrWhiteSpace(Model.ValidationMessage) ? "true" : "false"),
+            hasSuccessMessage: @(!string.IsNullOrWhiteSpace(Model.SuccessMessage) ? "true" : "false"),
+            validationMessage: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ValidationMessage ?? string.Empty)),
+            successMessage: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SuccessMessage ?? string.Empty))
+        };
+    </script>
+}

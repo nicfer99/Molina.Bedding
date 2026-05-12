@@ -1,0 +1,122 @@
+@model WorkMenuViewModel
+@{
+    ViewData["Title"] = "Schermata 2 - Selezione lavorazione";
+}
+
+<section class="page-section page-section--wide page-section--workmenu-expanded">
+    <header class="page-header page-header--compact page-header--workmenu">
+        <div>
+            <div class="page-kicker">Schermata 2</div>
+            <h1>Selezione lavorazione</h1>
+            <p class="page-intro">
+                Scegli l'area e premi l'operazione da registrare.
+            </p>
+        </div>
+        <div class="selected-operators-panel" aria-label="Operatori selezionati">
+            <div class="selected-operators-head">
+                <span class="note-label">Operatori selezionati</span>
+                <strong>@Model.SelectedOperators.Count</strong>
+            </div>
+            <div class="selected-operators-list">
+                @foreach (var operatorItem in Model.SelectedOperators)
+                {
+                    <span class="selected-operator-chip">@operatorItem.Name</span>
+                }
+            </div>
+        </div>
+    </header>
+
+    <div class="work-area-grid work-area-grid--aligned">
+        @foreach (var area in Model.Areas)
+        {
+            <section class="work-area-card work-area-card--large" aria-labelledby="@($"{area.Id}-title")">
+                <header class="work-area-header work-area-header--centered">
+                    <h2 id="@($"{area.Id}-title")">@area.Title</h2>
+                </header>
+
+                <div class="work-area-actions work-area-actions--large">
+                    @for (var rowIndex = 1; rowIndex <= 3; rowIndex++)
+                    {
+                        var action = area.Actions.FirstOrDefault(item => item.Row == rowIndex);
+
+                        if (action is null)
+                        {
+                            <div class="action-slot action-slot--placeholder" aria-hidden="true"></div>
+                            continue;
+                        }
+
+                        var targetUrl = string.Empty;
+                        var pendingMessage = string.Empty;
+                        var requiresProductionModeChoice = string.Equals(action.Id, "trapunte-dichiarazione-produzione", StringComparison.Ordinal);
+                        var macchinaUrl = requiresProductionModeChoice
+                            ? Url.Action("Launches", "ProductionDeclaration", new { actionId = action.Id, productionMode = "macchina" }) ?? string.Empty
+                            : string.Empty;
+                        var riempimentoUrl = requiresProductionModeChoice
+                            ? Url.Action("Launches", "ProductionDeclaration", new { actionId = action.Id, productionMode = "riempimento" }) ?? string.Empty
+                            : string.Empty;
+
+                        if (action.Id.Contains("dichiarazione-produzione", StringComparison.Ordinal) && !requiresProductionModeChoice)
+                        {
+                            targetUrl = Url.Action("Launches", "ProductionDeclaration", new { actionId = action.Id }) ?? string.Empty;
+                        }
+                        else if (action.Id.Contains("pulizia", StringComparison.Ordinal))
+                        {
+                            targetUrl = Url.Action("Screen4", "ProductionDeclaration", new { actionId = action.Id }) ?? string.Empty;
+                        }
+                        else if (string.Equals(action.Id, "trapunte-setup-2f", StringComparison.Ordinal))
+                        {
+                            targetUrl = Url.Action("Screen4", "ProductionDeclaration", new { actionId = action.Id }) ?? string.Empty;
+                        }
+
+                        <div class="action-slot action-slot--large">
+                            <button
+                                type="button"
+                                class="dx-action-button dx-action-button--large dx-action-button--@action.Tone"
+                                data-action-id="@action.Id"
+                                data-action-text="@action.Text"
+                                data-action-icon="@action.Icon"
+                                data-action-tone="@action.Tone"
+                                data-target-url="@targetUrl"
+                                data-pending-message="@pendingMessage"
+                                data-requires-production-mode="@(requiresProductionModeChoice ? "true" : "false")"
+                                data-machine-url="@macchinaUrl"
+                                data-filling-url="@riempimentoUrl">
+                                @action.Text
+                            </button>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+
+    <div class="form-footer form-footer--split">
+        <a asp-action="Operators" asp-controller="ProductionDeclaration" class="secondary-action-link">
+            Indietro
+        </a>
+    </div>
+</section>
+
+<div class="screen4-qty-modal" id="trapunteProductionModeModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-production-mode-modal="true"></div>
+    <div class="screen4-qty-modal__dialog workmenu-mode-modal" role="dialog" aria-modal="true" aria-labelledby="trapunteProductionModeTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Linea Trapunte</div>
+                <h2 id="trapunteProductionModeTitle">Scegli la modalità</h2>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-production-mode-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="workmenu-mode-modal__content">
+            <button type="button" class="workmenu-mode-choice" data-production-mode-choice="riempimento">
+                Riempimento
+            </button>
+            <button type="button" class="workmenu-mode-choice" data-production-mode-choice="macchina">
+                Macchina
+            </button>
+        </div>
+    </div>
+</div>

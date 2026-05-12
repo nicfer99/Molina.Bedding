@@ -1,0 +1,72 @@
+@model OperatorSelectionViewModel
+@{
+    ViewData["Title"] = "Schermata 1 - Selezione operatore";
+    var preselectedIds = Model.SelectedOperatorIds
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToHashSet(StringComparer.Ordinal);
+}
+
+<section class="page-section page-section--operators-loose">
+    <header class="page-header page-header--operators">
+        <div>
+            <div class="page-kicker">Schermata 1</div>
+            <h1>Selezione operatore</h1>
+            <p class="page-intro">
+                Tocca uno o più nomi, poi premi Avanti.
+            </p>
+        </div>
+        <div class="page-header-note page-header-note--compact page-header-note--count">
+            <span class="note-label">Selezionati</span>
+            <strong id="selectionCount">0</strong>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ValidationMessage))
+    {
+        <div class="inline-alert" role="alert">
+            @Model.ValidationMessage
+        </div>
+    }
+
+    <form asp-action="WorkMenu" asp-controller="ProductionDeclaration" method="post" id="operatorSelectionForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" id="SelectedOperatorIds" name="SelectedOperatorIds" value="@Model.SelectedOperatorIds" />
+
+        <div class="operator-grid operator-grid--large" id="operatorGrid" aria-label="Elenco operatori selezionabili">
+            @foreach (var operatorItem in Model.Operators)
+            {
+                var isSelected = preselectedIds.Contains(operatorItem.Id.ToString());
+                <button
+                    type="button"
+                    class="operator-card operator-card--large@(isSelected ? " is-selected" : string.Empty)"
+                    data-operator-id="@operatorItem.Id"
+                    data-operator-name="@operatorItem.Name"
+                    aria-pressed="@(isSelected ? "true" : "false")">
+                    <span class="operator-card-icon dx-icon-user"></span>
+                    <span class="operator-card-text">
+                        <span class="operator-card-name">@operatorItem.Name</span>
+                    </span>
+                    <span class="operator-card-check dx-icon-check"></span>
+                </button>
+            }
+        </div>
+
+        <div class="form-footer form-footer--split form-footer--operators">
+            <a asp-action="Start" asp-controller="ProductionDeclaration" class="secondary-action-link">
+                Indietro
+            </a>
+            <button type="submit" id="continueButton" class="primary-action-button" disabled>
+                Avanti
+            </button>
+        </div>
+    </form>
+</section>
+
+@section Scripts {
+    <script>
+        window.molinaOperatorsPage = {
+            hasValidationMessage: @(!string.IsNullOrWhiteSpace(Model.ValidationMessage) ? "true" : "false"),
+            validationMessage: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ValidationMessage ?? string.Empty))
+        };
+    </script>
+}

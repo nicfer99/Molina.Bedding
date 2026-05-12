@@ -1,0 +1,39 @@
+USE [U_MOLINA]
+
+GO
+ 
+/****** Object:  Table [dbo].[X_OE_OPERATORI_BEDDING]    Script Date: 07/04/2026 09:40:40 ******/
+
+SET ANSI_NULLS ON
+
+GO
+ 
+SET QUOTED_IDENTIFIER ON
+
+GO
+ 
+CREATE TABLE [dbo].[X_OE_OPERATORI_BEDDING](
+
+	[prg_operatore_bedding] [int] IDENTITY(1,1) NOT NULL,
+
+	[des_operatore_bedding] [varchar](50) NOT NULL,
+
+	[bol_annullato] [bit] NOT NULL,
+
+CONSTRAINT [X_OE_OPERATORI_BEDDING_PrimaryKey] PRIMARY KEY NONCLUSTERED 
+
+(
+
+	[prg_operatore_bedding] ASC
+
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+
+) ON [PRIMARY]
+
+GO
+ 
+ALTER TABLE [dbo].[X_OE_OPERATORI_BEDDING] ADD  DEFAULT ((0)) FOR [bol_annullato]
+
+GO
+
+ 

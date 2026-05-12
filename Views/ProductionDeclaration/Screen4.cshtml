@@ -1,0 +1,635 @@
+@model Screen4ViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Schermata 4";
+    var productionModeText = Model.ProductionMode switch
+    {
+        "riempimento" => "Riempimento",
+        "macchina" => "Macchina",
+        _ => string.Empty
+    };
+    var lineDisplayTitle = string.IsNullOrWhiteSpace(Model.LineDisplayName) || string.Equals(Model.LineDisplayName, Model.AreaTitle, System.StringComparison.OrdinalIgnoreCase)
+        ? Model.AreaTitle
+        : $"{Model.AreaTitle} - {Model.LineDisplayName}";
+}
+
+<section class="page-section page-section--wide page-section--screen4"
+         data-screen4-page="true"
+         data-timing-only-mode="@Model.IsTimingOnlyMode.ToString().ToLowerInvariant()"
+         data-requires-material-lot-selection="@Model.RequiresMaterialLotSelection.ToString().ToLowerInvariant()"
+         data-auto-fill-max-from-barcode="@Model.AutoFillMaxQuantityFromBarcode.ToString().ToLowerInvariant()">
+    <header class="page-header page-header--compact">
+        <div>
+            <div class="page-kicker">Schermata 4</div>
+            <h1>@Model.ActionText</h1>
+            <p class="page-intro">
+                @lineDisplayTitle@if (!string.IsNullOrWhiteSpace(productionModeText))
+                {
+                    <text> - @productionModeText</text>
+                }
+            </p>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+    {
+        <div class="inline-alert inline-alert--success" role="status">
+            @Model.SuccessMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ValidationMessage))
+    {
+        <div class="inline-alert" role="alert">
+            @Model.ValidationMessage
+        </div>
+    }
+
+    <form asp-action="InsertDeclarations" asp-controller="ProductionDeclaration" method="post" id="screen4InsertForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="ActionId" value="@Model.ActionId" />
+        <input type="hidden" name="ProductionMode" value="@Model.ProductionMode" />
+        <input type="hidden" name="ConfirmedOverLimitOrderIds" value="@Model.ConfirmedOverLimitOrderIds" data-confirmed-over-limit-hidden="true" />
+        <input type="hidden" name="DeclarationDate" value="@Model.DeclarationDate.ToString("yyyy-MM-dd")" data-declaration-date-hidden="true" />
+
+        <div class="screen4-card screen4-card--table-layout">
+            <div class="screen4-summary-bar screen4-summary-bar--screen4">
+                <div class="screen4-block screen4-block--summary">
+                    <span class="note-label">Operatori selezionati</span>
+                    <div class="selected-operators-list">
+                        @foreach (var operatorItem in Model.SelectedOperators)
+                        {
+                            <span class="selected-operator-chip">@operatorItem.Name</span>
+                        }
+                    </div>
+                </div>
+
+                @* Box linea nascosto temporaneamente su richiesta. *@
+
+                <div class="screen4-detail screen4-detail--date-global">
+                    <span class="screen4-detail-label">Data</span>
+                    <div class="screen4-date-box">
+                        <input type="date"
+                               value="@Model.DeclarationDate.ToString("yyyy-MM-dd")"
+                               class="screen4-date-input"
+                               data-declaration-date-input="true"
+                               @(Model.IsDeclarationDateEditable ? null : "disabled") />
+                        @if (Model.CanRequestDateEdit)
+                        {
+                            <button type="button" class="screen4-inline-button screen4-inline-button--secondary" data-request-date-edit="true">
+                                @(Model.IsDeclarationDateEditable ? "Data sbloccata" : "Modifica data")
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (!Model.IsTimingOnlyMode)
+                {
+                    <div class="screen4-detail screen4-detail--total-produced-global">
+                        <span class="screen4-detail-label">Qta dichiarata</span>
+                        <div class="screen4-total-produced-box">
+                            <strong data-total-declared-value="true">@Model.TotalDeclared.ToString("0.##")</strong>
+                        </div>
+                    </div>
+                }
+
+                <div class="screen4-detail screen4-detail--timing-global">
+                    <span class="screen4-detail-label">Timing totale</span>
+                    <div class="screen4-global-timing-box">
+                        <button type="button" class="screen4-inline-button screen4-inline-button--stacked" data-open-global-timing="true">Timing</button>
+                        <div class="screen4-time-display screen4-time-display--global" data-global-timing-display="true">
+                            <span data-global-timing-text="true">00 h 00 m</span>
+                            <button type="button"
+                                    class="screen4-summary-clear is-hidden"
+                                    data-clear-global-timing="true"
+                                    aria-label="Annulla timing"
+                                    title="Annulla timing">
+                                ×
+                            </button>
+                        </div>
+                        <input type="hidden" name="GlobalTimingHours" value="@Model.GlobalTimingHours" data-global-timing-hours-hidden="true" />
+                        <input type="hidden" name="GlobalTimingMinutes" value="@Model.GlobalTimingMinutes" data-global-timing-minutes-hidden="true" />
+                    </div>
+                </div>
+
+                @if (!Model.IsTimingOnlyMode)
+                {
+                    <div class="screen4-detail screen4-detail--problem-global">
+                        <span class="screen4-detail-label">Blocchi produzione o anomalie</span>
+                        <div class="screen4-global-problem-box">
+                            <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" data-open-global-problem="true">Blocchi produzione o anomalie</button>
+                            <div class="screen4-problem-summary screen4-problem-summary--global" data-global-problem-summary="true">
+                                <span data-global-problem-summary-text="true">Nessun blocco o anomalia</span>
+                                <button type="button"
+                                        class="screen4-summary-clear is-hidden"
+                                        data-clear-global-problem="true"
+                                        aria-label="Annulla blocco o anomalia"
+                                        title="Annulla blocco o anomalia">
+                                    ×
+                                </button>
+                            </div>
+                            <input type="hidden" name="GlobalProblemDescription" value="@Model.GlobalProblemDescription" data-global-problem-description-hidden="true" />
+                            <input type="hidden" name="GlobalProblemHours" value="@Model.GlobalProblemHours" data-global-problem-hours-hidden="true" />
+                            <input type="hidden" name="GlobalProblemMinutes" value="@Model.GlobalProblemMinutes" data-global-problem-minutes-hidden="true" />
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (Model.SelectedLaunches.Count > 0)
+            {
+                <div class="screen4-block screen4-block--table">
+                    <span class="note-label">Lotti selezionati</span>
+
+                    <div class="screen4-table-wrap">
+                        <table class="screen4-table screen4-table--wide">
+                            <thead>
+                                <tr>
+                                    <th>Lotto</th>
+                                    <th>Numero Documento</th>
+                                    <th>Fase</th>
+                                    <th>Qta da produrre</th>
+                                    <th>Qta prodotta</th>
+                                    <th>Qta dichiarata</th>
+                                    <th>Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var index = 0; index < Model.SelectedLaunches.Count; index++)
+                                {
+                                    var launch = Model.SelectedLaunches[index];
+                                    var maxQuantity = launch.QuantityToProduce ?? 0m;
+                                    var producedQuantity = launch.QuantityProduced ?? 0m;
+                                    var remainingQuantity = Math.Max(maxQuantity - producedQuantity, 0m);
+                                    var declaredQuantity = launch.QuantityDeclared;
+                                    var maxQuantityText = maxQuantity.ToString("0.##", CultureInfo.InvariantCulture);
+                                    var producedQuantityText = producedQuantity.ToString("0.##", CultureInfo.InvariantCulture);
+                                    var remainingQuantityText = remainingQuantity.ToString("0.##", CultureInfo.InvariantCulture);
+                                    var declaredQuantityText = declaredQuantity?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty;
+                                    var historyRowId = $"screen4History{index}";
+                                    var disableQuantityActions = remainingQuantity <= 0m;
+                                    var showPartialQuantityAction = maxQuantity != 1m;
+                                    var launchMaterialLotsJson = System.Text.Json.JsonSerializer.Serialize(launch.AvailableMaterialLots ?? new List<string>());
+                                    var launchMaterialLotsBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(launchMaterialLotsJson));
+
+                                    <tr class="screen4-table-row"
+                                        data-screen4-slot="true"
+                                        data-order-id="@launch.OrderId"
+                                        data-slot-index="@index"
+                                        data-max-qty="@maxQuantityText"
+                                        data-produced-qty="@producedQuantityText"
+                                        data-remaining-qty="@remainingQuantityText"
+                                        data-lot-code="@launch.LotCode"
+                                        data-material-lots-base64="@launchMaterialLotsBase64"
+                                        data-material-lot-error="@launch.MaterialLotValidationMessage">
+                                        <td data-label="Lotto"
+                                            class="screen4-table-lot-cell@(Model.RequiresMaterialLotSelection ? " screen4-table-lot-cell--editable" : string.Empty)@(string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) ? string.Empty : " has-material-lot")"
+                                            data-edit-material-lot-cell="@(Model.RequiresMaterialLotSelection ? "true" : null)"
+                                            tabindex="@(Model.RequiresMaterialLotSelection ? "0" : null)"
+                                            role="@(Model.RequiresMaterialLotSelection ? "button" : null)"
+                                            aria-label="@(Model.RequiresMaterialLotSelection ? "Apri selezione lotto per questa riga" : null)">
+                                            <div class="screen4-table-lot">@launch.LotCode</div>
+                                            <button type="button"
+                                                    class="screen4-table-material-lot screen4-table-material-lot--editable@(string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) ? " is-hidden" : string.Empty)"
+                                                    data-material-lot-display="true"
+                                                    data-edit-material-lot-trigger="true"
+                                                    title="Modifica il lotto selezionato"
+                                                    aria-label="Modifica il lotto selezionato">
+                                                @launch.SelectedMaterialLotCode
+                                            </button>
+                                        </td>
+                                        <td data-label="Numero Documento">
+                                            <div class="screen4-table-doc">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? launch.DocumentNumber : "-")</div>
+                                        </td>
+                                        <td data-label="Fase">
+                                            <div class="screen4-table-phase">&nbsp;</div>
+                                        </td>
+                                        <td data-label="Qta da produrre">
+                                            <div class="screen4-table-number" data-max-value="true">@(launch.QuantityToProduce?.ToString("0.##") ?? "-")</div>
+                                        </td>
+                                        <td data-label="Qta prodotta">
+                                            <div class="screen4-produced-cell">
+                                                <strong class="screen4-table-number screen4-table-number--produced-readonly">@producedQuantity.ToString("0.##")</strong>
+                                            </div>
+                                        </td>
+                                        <td data-label="Qta dichiarata">
+                                            <div class="screen4-produced-cell">
+                                                <strong class="screen4-table-number screen4-table-number--declared" data-declared-value="true">@(launch.QuantityDeclared?.ToString("0.##") ?? "-")</strong>
+                                            </div>
+                                            <input type="hidden" name="Rows[@index].OrderId" value="@launch.OrderId" />
+                                            <input type="hidden" name="Rows[@index].QuantityDeclared" value="@declaredQuantityText" data-declared-hidden="true" />
+                                            <input type="hidden" name="Rows[@index].SelectedMaterialLotCode" value="@launch.SelectedMaterialLotCode" data-material-lot-hidden="true" />
+                                        </td>
+                                        <td data-label="Azioni">
+                                            <div class="screen4-slot-actions screen4-slot-actions--table">
+                                                <button type="button"
+                                                        class="screen4-slot-button screen4-slot-button--max"
+                                                        data-set-max="true"
+                                                        title="@(disableQuantityActions ? "Quantità già completata" : "Imposta la qta massima residua")"
+                                                        disabled="@(disableQuantityActions ? "disabled" : null)">
+                                                    Max
+                                                </button>
+                                                @if (Model.RequiresMaterialLotSelection)
+                                                {
+                                                    <button type="button"
+                                                            class="screen4-slot-button screen4-slot-button--history"
+                                                            data-edit-material-lot="true"
+                                                            title="Seleziona o modifica il lotto">
+                                                        Lotto
+                                                    </button>
+                                                }
+                                                @if (showPartialQuantityAction)
+                                                {
+                                                    <button type="button"
+                                                            class="screen4-slot-button screen4-slot-button--partial"
+                                                            data-set-partial="true"
+                                                            title="@(disableQuantityActions ? "Quantità già completata" : "Inserisci una qta parziale residua")"
+                                                            disabled="@(disableQuantityActions ? "disabled" : null)">
+                                                        Qta Parziale
+                                                    </button>
+                                                }
+                                                @if (launch.HasPreviousDeclarations)
+                                                {
+                                                    <button type="button"
+                                                            class="screen4-slot-button screen4-slot-button--history"
+                                                            data-toggle-history="true"
+                                                            data-history-target="@historyRowId"
+                                                            aria-expanded="false">
+                                                        Mostra precedenti
+                                                    </button>
+                                                }
+                                                <button type="button"
+                                                        class="screen4-slot-clear screen4-slot-clear--table@(string.IsNullOrWhiteSpace(declaredQuantityText) ? " is-hidden" : string.Empty)"
+                                                        data-clear-slot="true"
+                                                        aria-label="Annulla dati riga"
+                                                        title="Annulla dati riga">
+                                                    ×
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    @if (launch.HasPreviousDeclarations)
+                                    {
+                                        <tr class="screen4-history-row is-hidden" id="@historyRowId" data-history-row="true">
+                                            <td colspan="7">
+                                                <div class="screen4-history-wrap">
+                                                    <div class="screen4-history-title">Dichiarazioni precedenti</div>
+                                                    <div class="screen4-history-table-wrap">
+                                                        <table class="screen4-history-table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Data / ora</th>
+                                                                    <th>Qta dichiarata</th>
+                                                                    <th>Minuti lavorati</th>
+                                                                    <th>Operatori</th>
+                                                                    <th>Blocco / anomalia</th>
+                                                                    <th>Minuti anomalia</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var previousDeclaration in launch.PreviousDeclarations)
+                                                                {
+                                                                    <tr>
+                                                                        <td class="screen4-history-datetime" title="@(previousDeclaration.DeclarationDateTime.ToString("dd/MM/yyyy HH:mm"))">
+                                                                            <span class="screen4-history-date">@previousDeclaration.DeclarationDateTime.ToString("dd/MM/yyyy")</span>
+                                                                            <span class="screen4-history-time">@previousDeclaration.DeclarationDateTime.ToString("HH:mm")</span>
+                                                                        </td>
+                                                                        <td>@previousDeclaration.DeclaredQuantity.ToString("0.##")</td>
+                                                                        <td>@previousDeclaration.WorkedMinutes</td>
+                                                                        <td>@(!string.IsNullOrWhiteSpace(previousDeclaration.OperatorsSummary) ? previousDeclaration.OperatorsSummary : "-")</td>
+                                                                        <td>@(!string.IsNullOrWhiteSpace(previousDeclaration.AnomalyDescription) ? previousDeclaration.AnomalyDescription : "-")</td>
+                                                                        <td>@(previousDeclaration.AnomalyMinutes > 0 ? previousDeclaration.AnomalyMinutes.ToString() : "-")</td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="form-footer form-footer--split">
+            @if (Model.BackActionName == "Launches")
+            {
+                <a asp-action="Launches" asp-controller="ProductionDeclaration" asp-route-actionId="@Model.ActionId" asp-route-productionMode="@Model.ProductionMode" class="secondary-action-link">
+                    Indietro
+                </a>
+            }
+            else
+            {
+                <a asp-action="WorkMenu" asp-controller="ProductionDeclaration" class="secondary-action-link">
+                    Indietro
+                </a>
+            }
+
+            @if (Model.SelectedLaunches.Count > 0 || Model.IsTimingOnlyMode)
+            {
+                <button type="submit"
+                        class="primary-action-button"
+                        id="screen4InsertButton"
+                        @(Model.IsTimingOnlyMode && Model.GlobalTimingHours <= 0 && Model.GlobalTimingMinutes <= 0 ? "hidden" : null)
+                        @(!Model.IsTimingOnlyMode && Model.GlobalTimingHours <= 0 && Model.GlobalTimingMinutes <= 0 ? "disabled" : null)>
+                    Inserisci
+                </button>
+            }
+        </div>
+    </form>
+</section>
+
+<div class="screen4-qty-modal" id="screen4DatePinModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-date-pin-modal="true"></div>
+    <div class="screen4-qty-modal__dialog screen4-date-pin-modal" role="dialog" aria-modal="true" aria-labelledby="screen4DatePinModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Modifica data</div>
+                <h2 id="screen4DatePinModalTitle">Inserisci il PIN</h2>
+                <p class="screen4-date-pin-modal__intro">Per sbloccare la data usa il PIN dell'operatore abilitato.</p>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-date-pin-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-qty-modal__content">
+            <label class="screen4-date-pin-modal__label" for="screen4DatePinInput">PIN operatore</label>
+            <input type="password"
+                   id="screen4DatePinInput"
+                   class="screen4-date-pin-modal__input"
+                   inputmode="numeric"
+                   pattern="[0-9]*"
+                   autocomplete="off" />
+            <div class="screen4-date-pin-modal__help" id="screen4DatePinHelp">Inserisci il PIN dell'operatore abilitato alla modifica data.</div>
+            <div class="screen4-qty-keypad screen4-date-pin-modal__keypad" aria-label="Tastierino numerico PIN">
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="1">1</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="2">2</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="3">3</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="4">4</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="5">5</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="6">6</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="7">7</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="8">8</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="9">9</button>
+                <button type="button" class="screen4-qty-key screen4-qty-key--secondary" data-date-pin-keypad-action="clear">C</button>
+                <button type="button" class="screen4-qty-key" data-date-pin-keypad-value="0">0</button>
+                <button type="button" class="screen4-qty-key screen4-qty-key--secondary" data-date-pin-keypad-action="backspace">⌫</button>
+            </div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-date-pin-modal="true">
+                Chiudi
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-date-pin="true">
+                    Conferma PIN
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="screen4-qty-modal" id="screen4QuantityModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-qty-modal="true"></div>
+    <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4QuantityModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker" data-qty-modal-kicker="true">Quantità parziale</div>
+                <h2 id="screen4QuantityModalTitle" data-qty-modal-title="true">Inserisci la quantità dichiarata</h2>
+                <p class="screen4-qty-modal__intro" data-qty-modal-intro="true">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-qty-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-qty-modal__content">
+            <div class="screen4-qty-modal__info">
+                <div class="screen4-qty-modal__info-box">
+                    <span class="note-label" id="screen4QtyModalReferenceLabel">Qta residua</span>
+                    <strong id="screen4QtyModalMax">0</strong>
+                </div>
+                <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
+                    <span class="note-label">Qta dichiarata</span>
+                    <strong id="screen4QtyModalDisplay">0</strong>
+                </div>
+            </div>
+
+            <div class="screen4-qty-keypad">
+                <button type="button" class="screen4-qty-key" data-keypad-value="1">1</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="2">2</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="3">3</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="4">4</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="5">5</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="6">6</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="7">7</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="8">8</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="9">9</button>
+                <button type="button" class="screen4-qty-key screen4-qty-key--secondary" data-keypad-action="clear">C</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value="0">0</button>
+                <button type="button" class="screen4-qty-key screen4-qty-key--secondary" data-keypad-action="backspace">⌫</button>
+                <button type="button" class="screen4-qty-key" data-keypad-value=",">,</button>
+            </div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-current-qty="true">
+                Annulla qta dichiarata
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-qty-modal="true">
+                    Chiudi
+                </button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-qty="true">
+                    Conferma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="screen4-qty-modal" id="screen4MaterialLotModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-material-lot-modal="true"></div>
+    <div class="screen4-qty-modal__dialog screen4-material-lot-modal" role="dialog" aria-modal="true" aria-labelledby="screen4MaterialLotModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Lotto</div>
+                <h2 id="screen4MaterialLotModalTitle">Inserisci il lotto</h2>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-material-lot-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-qty-modal__content">
+            <input type="hidden" id="screen4MaterialLotInput" value="" />
+            <div class="material-lot-scan-help" id="screen4MaterialLotHelp">
+                Seleziona il lotto toccando uno dei lotti disponibili.
+            </div>
+            <div class="material-lot-reference-list" data-material-lot-list="true" aria-label="Lotti disponibili"></div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-material-lot="true">
+                Annulla lotto
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-material-lot-modal="true">
+                    Chiudi
+                </button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-material-lot="true">
+                    Conferma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="screen4-time-modal" id="screen4TimingModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-timing-modal="true"></div>
+    <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4TimingModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Timing totale</div>
+                <h2 id="screen4TimingModalTitle">Inserisci il timing</h2>
+                <div class="screen4-modal-lot" id="screen4TimingModalLot">Valido per tutti i lotti selezionati</div>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-timing-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-time-display-panel">
+            <div class="screen4-time-display-main" id="screen4TimingModalDisplay">00 h 00 m</div>
+        </div>
+
+        <div class="screen4-time-grid">
+            <div class="screen4-time-section">
+                <div class="screen4-time-section__label">Ore</div>
+                <div class="screen4-time-hours-controls">
+                    <button type="button" class="screen4-time-adjust" data-timing-hours-adjust="-1">−1 ora</button>
+                    <div class="screen4-time-value-box" id="screen4TimingHoursValue">0</div>
+                    <button type="button" class="screen4-time-adjust" data-timing-hours-adjust="1">+1 ora</button>
+                </div>
+            </div>
+            <div class="screen4-time-section">
+                <div class="screen4-time-section__label">Minuti</div>
+                <div class="screen4-minute-options screen4-minute-options--timing">
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="0">00</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="5">5</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="10">10</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="15">15</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="20">20</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="25">25</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="30">30</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="35">35</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="40">40</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="45">45</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="50">50</button>
+                    <button type="button" class="screen4-minute-option" data-timing-minute-value="55">55</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-timing="true">
+                Annulla timing
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-timing-modal="true">
+                    Chiudi
+                </button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-timing="true">
+                    Conferma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="screen4-time-modal" id="screen4ProblemModal" hidden>
+    <div class="screen4-qty-modal__backdrop" data-close-problem-modal="true"></div>
+    <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4ProblemModalTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Blocchi produzione o anomalie</div>
+                <h2 id="screen4ProblemModalTitle">Inserisci blocco o anomalia</h2>
+                <div class="screen4-modal-lot" id="screen4ProblemModalLot">Valido per tutti i lotti selezionati</div>
+            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-problem-modal="true" aria-label="Chiudi finestra">
+                ×
+            </button>
+        </div>
+
+        <div class="screen4-problem-editor">
+            <label class="screen4-problem-label" for="screen4ProblemDescription">Descrizione blocco o anomalia</label>
+            <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata"></textarea>
+        </div>
+
+        <div class="screen4-time-display-panel screen4-time-display-panel--problem">
+            <div class="screen4-time-display-main" id="screen4ProblemModalDisplay">00 h 00 m</div>
+        </div>
+
+        <div class="screen4-time-grid">
+            <div class="screen4-time-section">
+                <div class="screen4-time-section__label">Ore</div>
+                <div class="screen4-time-hours-controls">
+                    <button type="button" class="screen4-time-adjust" data-problem-hours-adjust="-1">−1 ora</button>
+                    <div class="screen4-time-value-box" id="screen4ProblemHoursValue">0</div>
+                    <button type="button" class="screen4-time-adjust" data-problem-hours-adjust="1">+1 ora</button>
+                </div>
+            </div>
+            <div class="screen4-time-section">
+                <div class="screen4-time-section__label">Minuti</div>
+                <div class="screen4-minute-options screen4-minute-options--problem">
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="0">00</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="5">05</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="10">10</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="15">15</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="20">20</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="25">25</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="30">30</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="35">35</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="40">40</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="45">45</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="50">50</button>
+                    <button type="button" class="screen4-minute-option" data-problem-minute-value="55">55</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="screen4-qty-modal__footer">
+            <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-problem="true">
+                Annulla blocco o anomalia
+            </button>
+            <div class="screen4-qty-footer-actions">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-problem-modal="true">
+                    Chiudi
+                </button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-problem="true">
+                    Conferma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        window.molinaScreen4Page = {
+            hasValidationMessage: @(!string.IsNullOrWhiteSpace(Model.ValidationMessage) ? "true" : "false"),
+            hasSuccessMessage: @(!string.IsNullOrWhiteSpace(Model.SuccessMessage) ? "true" : "false"),
+            validationMessage: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ValidationMessage ?? string.Empty)),
+            successMessage: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SuccessMessage ?? string.Empty))
+        };
+    </script>
+}
