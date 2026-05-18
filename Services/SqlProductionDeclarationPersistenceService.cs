@@ -40,8 +40,8 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
                 d.dat_dichiarazione_time,
                 CAST(CASE WHEN ISNULL(q.qta_dichiarata, 0) <> 0 THEN q.qta_dichiarata ELSE q.qta_lavorata END AS decimal(10, 2)) AS qta_dichiarata,
                 ISNULL(q.num_minuti_lavorati, 0) AS num_minuti_lavorati,
-                ISNULL(d.des_anomalia, '') AS des_anomalia,
-                ISNULL(d.num_minuti_anomalia, 0) AS num_minuti_anomalia,
+                ISNULL(d.des_nota, '') AS des_anomalia,
+                ISNULL(d.num_minuti_nota, 0) AS num_minuti_anomalia,
                 ISNULL(ops.des_operatori, '') AS des_operatori
             FROM [dbo].[X_OE_PROD_DICH_QPR] q
             INNER JOIN [dbo].[X_OE_PROD_DICH] d
@@ -88,8 +88,8 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
                     d.dat_dichiarazione_time,
                     CAST(ISNULL(q.qta_lavorata, 0) AS decimal(10, 2)) AS qta_dichiarata,
                     ISNULL(q.num_minuti_lavorati, 0) AS num_minuti_lavorati,
-                    ISNULL(d.des_anomalia, '') AS des_anomalia,
-                    ISNULL(d.num_minuti_anomalia, 0) AS num_minuti_anomalia,
+                    ISNULL(d.des_nota, '') AS des_anomalia,
+                    ISNULL(d.num_minuti_nota, 0) AS num_minuti_anomalia,
                     ISNULL(ops.des_operatori, '') AS des_operatori
                 FROM [dbo].[X_OE_PROD_DICH_QPR] q
                 INNER JOIN [dbo].[X_OE_PROD_DICH] d
@@ -183,7 +183,18 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
             var declarationDate = request.DeclarationDate.Date;
             var timestamp = declarationDate + now.TimeOfDay;
             var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, transaction);
-            var declarationId = InsertDeclarationHeader(connection, transaction, request, timestamp, hasPhaseCodeColumn);
+            var hasNoteTypeColumn = HasNoteTypeColumn(connection, transaction);
+            var hasNoteDescriptionColumn = HasNoteDescriptionColumn(connection, transaction);
+            var hasNoteMinutesColumn = HasNoteMinutesColumn(connection, transaction);
+            var declarationId = InsertDeclarationHeader(
+                connection,
+                transaction,
+                request,
+                timestamp,
+                hasPhaseCodeColumn,
+                hasNoteTypeColumn,
+                hasNoteDescriptionColumn,
+                hasNoteMinutesColumn);
             InsertDeclarationOperators(connection, transaction, declarationId, request.OperatorIds);
             var hasDeclaredQuantityColumn = HasQtaDichiarataColumn(connection, transaction);
             InsertDeclarationRows(connection, transaction, declarationId, request.Rows, request.TimingMinutes, hasDeclaredQuantityColumn);
@@ -198,53 +209,217 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         }
     }
 
-    private static int InsertDeclarationHeader(SqlConnection connection, SqlTransaction transaction, ProductionDeclarationInsertRequest request, DateTime timestamp, bool hasPhaseCodeColumn)
+    public int InsertDirectDeclaration(ProductionDeclarationInsertRequest request)
     {
-        var sql = hasPhaseCodeColumn
-            ? """
-                INSERT INTO [dbo].[X_OE_PROD_DICH]
-                (
-                    [cod_linea_produzione],
-                    [cod_fase],
-                    [dat_dichiarazione],
-                    [dat_dichiarazione_time],
-                    [num_minuti_lavorati],
-                    [des_anomalia],
-                    [num_minuti_anomalia]
-                )
-                VALUES
-                (
-                    @lineCode,
-                    @phaseCode,
-                    @declarationDate,
-                    @declarationDateTime,
-                    @workedMinutes,
-                    @anomalyDescription,
-                    @anomalyMinutes
-                );
-                SELECT CAST(SCOPE_IDENTITY() AS int);
-                """
-            : """
-                INSERT INTO [dbo].[X_OE_PROD_DICH]
-                (
-                    [cod_linea_produzione],
-                    [dat_dichiarazione],
-                    [dat_dichiarazione_time],
-                    [num_minuti_lavorati],
-                    [des_anomalia],
-                    [num_minuti_anomalia]
-                )
-                VALUES
-                (
-                    @lineCode,
-                    @declarationDate,
-                    @declarationDateTime,
-                    @workedMinutes,
-                    @anomalyDescription,
-                    @anomalyMinutes
-                );
-                SELECT CAST(SCOPE_IDENTITY() AS int);
-                """;
+        if (string.IsNullOrWhiteSpace(request.LineCode))
+        {
+            throw new InvalidOperationException("La linea di produzione e obbligatoria per inserire la dichiarazione.");
+        }
+
+        if (request.OperatorIds.Count == 0)
+        {
+            throw new InvalidOperationException("Seleziona almeno un operatore prima di inserire la dichiarazione.");
+        }
+
+        if (request.TimingMinutes <= 0)
+        {
+            throw new InvalidOperationException("Inserisci il timing prima di procedere.");
+        }
+
+        using var connection = _dbConnectionFactory.CreateConnection();
+        connection.Open();
+
+        using var transaction = connection.BeginTransaction();
+        try
+        {
+            var now = DateTime.Now;
+            var declarationDate = request.DeclarationDate.Date;
+            var timestamp = declarationDate + now.TimeOfDay;
+            var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, transaction);
+            var hasNoteTypeColumn = HasNoteTypeColumn(connection, transaction);
+            var hasNoteDescriptionColumn = HasNoteDescriptionColumn(connection, transaction);
+            var hasNoteMinutesColumn = HasNoteMinutesColumn(connection, transaction);
+            var hasGenericDeclarationColumn = HasGenericDeclarationColumn(connection, transaction);
+            var declarationId = InsertDirectDeclarationHeader(
+                connection,
+                transaction,
+                request,
+                timestamp,
+                hasPhaseCodeColumn,
+                hasNoteTypeColumn,
+                hasNoteDescriptionColumn,
+                hasNoteMinutesColumn,
+                hasGenericDeclarationColumn);
+            InsertDeclarationOperators(connection, transaction, declarationId, request.OperatorIds);
+            transaction.Commit();
+            return declarationId;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    private static int InsertDirectDeclarationHeader(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        ProductionDeclarationInsertRequest request,
+        DateTime timestamp,
+        bool hasPhaseCodeColumn,
+        bool hasNoteTypeColumn,
+        bool hasNoteDescriptionColumn,
+        bool hasNoteMinutesColumn,
+        bool hasGenericDeclarationColumn)
+    {
+        var columns = new List<string>
+        {
+            "[cod_linea_produzione]",
+            "[dat_dichiarazione]",
+            "[dat_dichiarazione_time]",
+            "[num_minuti_lavorati]"
+        };
+        var values = new List<string>
+        {
+            "@lineCode",
+            "@declarationDate",
+            "@declarationDateTime",
+            "@workedMinutes"
+        };
+
+        if (hasPhaseCodeColumn)
+        {
+            columns.Insert(1, "[cod_fase]");
+            values.Insert(1, "@phaseCode");
+        }
+
+        if (hasNoteTypeColumn)
+        {
+            columns.Add("[prg_dichiarazione_tipo_nota]");
+            values.Add("@noteTypeId");
+        }
+
+        if (hasNoteDescriptionColumn)
+        {
+            columns.Add("[des_nota]");
+            values.Add("@noteDescription");
+        }
+
+        if (hasNoteMinutesColumn)
+        {
+            columns.Add("[num_minuti_nota]");
+            values.Add("@noteMinutes");
+        }
+
+        if (hasGenericDeclarationColumn)
+        {
+            columns.Add("[bol_dichiarazione_generica]");
+            values.Add("@isGenericDeclaration");
+        }
+
+        var sql = $"""
+            INSERT INTO [dbo].[X_OE_PROD_DICH]
+            (
+                {string.Join(",\n                ", columns)}
+            )
+            VALUES
+            (
+                {string.Join(",\n                ", values)}
+            );
+            SELECT CAST(SCOPE_IDENTITY() AS int);
+            """;
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        command.Parameters.Add(new SqlParameter("@lineCode", request.LineCode.Trim()));
+        if (hasPhaseCodeColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@phaseCode", string.IsNullOrWhiteSpace(request.PhaseCode) ? DBNull.Value : request.PhaseCode.Trim()));
+        }
+        if (hasNoteTypeColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteTypeId", request.NoteTypeId.HasValue ? request.NoteTypeId.Value : DBNull.Value));
+        }
+        command.Parameters.Add(new SqlParameter("@declarationDate", timestamp.Date));
+        command.Parameters.Add(new SqlParameter("@declarationDateTime", timestamp));
+        command.Parameters.Add(new SqlParameter("@workedMinutes", request.TimingMinutes));
+        if (hasNoteDescriptionColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteDescription", (object?)request.NoteDescription?.Trim() ?? DBNull.Value));
+        }
+        if (hasNoteMinutesColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteMinutes", System.Data.SqlDbType.Int) { Value = request.NoteMinutes });
+        }
+        if (hasGenericDeclarationColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@isGenericDeclaration", System.Data.SqlDbType.Bit) { Value = true });
+        }
+
+        return Convert.ToInt32(command.ExecuteScalar());
+    }
+
+    private static int InsertDeclarationHeader(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        ProductionDeclarationInsertRequest request,
+        DateTime timestamp,
+        bool hasPhaseCodeColumn,
+        bool hasNoteTypeColumn,
+        bool hasNoteDescriptionColumn,
+        bool hasNoteMinutesColumn)
+    {
+        var columns = new List<string>
+        {
+            "[cod_linea_produzione]",
+            "[dat_dichiarazione]",
+            "[dat_dichiarazione_time]",
+            "[num_minuti_lavorati]"
+        };
+        var values = new List<string>
+        {
+            "@lineCode",
+            "@declarationDate",
+            "@declarationDateTime",
+            "@workedMinutes"
+        };
+
+        if (hasPhaseCodeColumn)
+        {
+            columns.Insert(1, "[cod_fase]");
+            values.Insert(1, "@phaseCode");
+        }
+
+        if (hasNoteTypeColumn)
+        {
+            columns.Add("[prg_dichiarazione_tipo_nota]");
+            values.Add("@noteTypeId");
+        }
+
+        if (hasNoteDescriptionColumn)
+        {
+            columns.Add("[des_nota]");
+            values.Add("@noteDescription");
+        }
+
+        if (hasNoteMinutesColumn)
+        {
+            columns.Add("[num_minuti_nota]");
+            values.Add("@noteMinutes");
+        }
+
+        var sql = $"""
+            INSERT INTO [dbo].[X_OE_PROD_DICH]
+            (
+                {string.Join(",\n                ", columns)}
+            )
+            VALUES
+            (
+                {string.Join(",\n                ", values)}
+            );
+            SELECT CAST(SCOPE_IDENTITY() AS int);
+            """;
 
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -254,11 +429,21 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         {
             command.Parameters.Add(new SqlParameter("@phaseCode", string.IsNullOrWhiteSpace(request.PhaseCode) ? DBNull.Value : request.PhaseCode.Trim()));
         }
+        if (hasNoteTypeColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteTypeId", request.NoteTypeId.HasValue ? request.NoteTypeId.Value : DBNull.Value));
+        }
         command.Parameters.Add(new SqlParameter("@declarationDate", timestamp.Date));
         command.Parameters.Add(new SqlParameter("@declarationDateTime", timestamp));
         command.Parameters.Add(new SqlParameter("@workedMinutes", request.TimingMinutes));
-        command.Parameters.Add(new SqlParameter("@anomalyDescription", (object?)request.AnomalyDescription?.Trim() ?? DBNull.Value));
-        command.Parameters.Add(new SqlParameter("@anomalyMinutes", request.AnomalyMinutes));
+        if (hasNoteDescriptionColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteDescription", (object?)request.AnomalyDescription?.Trim() ?? DBNull.Value));
+        }
+        if (hasNoteMinutesColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteMinutes", request.AnomalyMinutes));
+        }
 
         return Convert.ToInt32(command.ExecuteScalar());
     }
@@ -406,5 +591,36 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'cod_fase') IS NULL THEN 0 ELSE 1 END";
         return Convert.ToInt32(command.ExecuteScalar()) == 1;
     }
-}
 
+    private static bool HasNoteDescriptionColumn(SqlConnection connection, SqlTransaction? transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'des_nota') IS NULL THEN 0 ELSE 1 END";
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static bool HasNoteTypeColumn(SqlConnection connection, SqlTransaction? transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'prg_dichiarazione_tipo_nota') IS NULL THEN 0 ELSE 1 END";
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static bool HasNoteMinutesColumn(SqlConnection connection, SqlTransaction? transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'num_minuti_nota') IS NULL THEN 0 ELSE 1 END";
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static bool HasGenericDeclarationColumn(SqlConnection connection, SqlTransaction? transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'bol_dichiarazione_generica') IS NULL THEN 0 ELSE 1 END";
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+}

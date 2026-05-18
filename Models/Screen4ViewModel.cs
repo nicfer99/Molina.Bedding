@@ -10,6 +10,8 @@ public class Screen4ViewModel
     public string ProductionMode { get; set; } = string.Empty;
     public List<OperatorItemViewModel> SelectedOperators { get; set; } = [];
     public List<Screen4SelectedLaunchViewModel> SelectedLaunches { get; set; } = [];
+    public List<DeclarationNoteTypeViewModel> AvailableNoteTypes { get; set; } = [];
+    public int? SelectedNoteTypeId { get; set; }
     public string BackActionName { get; set; } = "WorkMenu";
     public string? ValidationMessage { get; set; }
     public string? SuccessMessage { get; set; }

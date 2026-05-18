@@ -63,7 +63,7 @@
                         {
                             targetUrl = Url.Action("Screen4", "ProductionDeclaration", new { actionId = action.Id }) ?? string.Empty;
                         }
-                        else if (string.Equals(action.Id, "trapunte-setup-2f", StringComparison.Ordinal))
+                        else if (action.Id.Contains("dichiarazione-generica", StringComparison.Ordinal))
                         {
                             targetUrl = Url.Action("Screen4", "ProductionDeclaration", new { actionId = action.Id }) ?? string.Empty;
                         }

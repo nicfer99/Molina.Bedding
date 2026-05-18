@@ -45,6 +45,7 @@ Inserimento dichiarazioni:
 - `Database/20260407_update_X_OE_PROD_DICH_QPR_add_qta_dichiarata.sql`
 - `Database/20260407_update_X_OE_VW_PROD_LANCIO_qta_dichiarata.sql`
 - `Database/20260414_update_X_OE_PROD_DICH_add_cod_fase.sql`
+- `Database/20260512_update_X_OE_PROD_DICH_add_des_nota.sql`
 
 ## Limite di verifica
 Nel container corrente non è disponibile `dotnet`, quindi non è stata eseguita una build reale.

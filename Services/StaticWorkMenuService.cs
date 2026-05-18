@@ -24,8 +24,8 @@ public class StaticWorkMenuService : IWorkMenuService
                     },
                     new WorkAreaActionViewModel
                     {
-                        Id = "cassette-pulizia",
-                        Text = "Pulizia",
+                        Id = "cassette-dichiarazione-generica",
+                        Text = "Dichiarazione generica",
                         Icon = "preferences",
                         Tone = "normal",
                         Row = 3
@@ -48,11 +48,11 @@ public class StaticWorkMenuService : IWorkMenuService
                     },
                     new WorkAreaActionViewModel
                     {
-                        Id = "trapunte-setup-2f",
-                        Text = "Setup 2F",
+                        Id = "trapunte-dichiarazione-generica",
+                        Text = "Dichiarazione generica",
                         Icon = "preferences",
                         Tone = "default",
-                        Row = 2
+                        Row = 3
                     }
                 ]
             },
@@ -72,8 +72,8 @@ public class StaticWorkMenuService : IWorkMenuService
                     },
                     new WorkAreaActionViewModel
                     {
-                        Id = "guanciali-pulizia",
-                        Text = "Pulizia",
+                        Id = "guanciali-dichiarazione-generica",
+                        Text = "Dichiarazione generica",
                         Icon = "preferences",
                         Tone = "normal",
                         Row = 3
@@ -88,8 +88,8 @@ public class StaticWorkMenuService : IWorkMenuService
                 [
                     new WorkAreaActionViewModel
                     {
-                        Id = "pavimento-pulizia",
-                        Text = "Pulizia",
+                        Id = "pavimento-dichiarazione-generica",
+                        Text = "Dichiarazione generica",
                         Icon = "preferences",
                         Tone = "normal",
                         Row = 3

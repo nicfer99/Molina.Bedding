@@ -6,4 +6,5 @@ public interface IProductionDeclarationPersistenceService
 {
     IReadOnlyList<DeclarationHistoryItemViewModel> GetPreviousDeclarationsByOrderIds(string lineCode, string? phaseCode, IReadOnlyList<int> orderIds);
     int InsertDeclaration(ProductionDeclarationInsertRequest request);
+    int InsertDirectDeclaration(ProductionDeclarationInsertRequest request);
 }

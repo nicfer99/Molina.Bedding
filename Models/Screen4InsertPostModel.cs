@@ -10,6 +10,7 @@ public class Screen4InsertPostModel
     public string ConfirmedOverLimitOrderIds { get; set; } = string.Empty;
     public int GlobalTimingHours { get; set; }
     public int GlobalTimingMinutes { get; set; }
+    public int? SelectedNoteTypeId { get; set; }
     public string GlobalProblemDescription { get; set; } = string.Empty;
     public int GlobalProblemHours { get; set; }
     public int GlobalProblemMinutes { get; set; }

@@ -1,7 +1,14 @@
 using Molina.Bedding.Mvc.DataAccess;
 using Molina.Bedding.Mvc.Services;
 
+var startupContentRootPath = Environment.GetEnvironmentVariable("ASPNETCORE_CONTENTROOT") ?? Directory.GetCurrentDirectory();
+Directory.CreateDirectory(Path.Combine(startupContentRootPath, "wwwroot"));
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSession(options =>
@@ -15,8 +22,17 @@ builder.Services.AddSingleton<IDbConnectionFactory, SqlDbConnectionFactory>();
 builder.Services.AddScoped<IOperatorCatalogService, SqlOperatorCatalogService>();
 builder.Services.AddScoped<IProductionLaunchService, SqlProductionLaunchService>();
 builder.Services.AddScoped<IProductionDeclarationPersistenceService, SqlProductionDeclarationPersistenceService>();
+builder.Services.AddScoped<IDeclarationNoteTypeCatalogService, SqlDeclarationNoteTypeCatalogService>();
 builder.Services.AddScoped<IDeclarationDateAuthorizationService, DeclarationDateAuthorizationService>();
 builder.Services.AddSingleton<IWorkMenuService, StaticWorkMenuService>();
+
+var webRootPath = builder.Environment.WebRootPath;
+if (string.IsNullOrWhiteSpace(webRootPath))
+{
+    webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+}
+
+Directory.CreateDirectory(webRootPath);
 
 var app = builder.Build();
 
