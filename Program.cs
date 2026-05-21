@@ -3,6 +3,10 @@ using Molina.Bedding.Mvc.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddSession(options =>
 {
@@ -15,6 +19,7 @@ builder.Services.AddSingleton<IDbConnectionFactory, SqlDbConnectionFactory>();
 builder.Services.AddScoped<IOperatorCatalogService, SqlOperatorCatalogService>();
 builder.Services.AddScoped<IProductionLaunchService, SqlProductionLaunchService>();
 builder.Services.AddScoped<IProductionDeclarationPersistenceService, SqlProductionDeclarationPersistenceService>();
+builder.Services.AddScoped<IDeclarationNoteTypeCatalogService, SqlDeclarationNoteTypeCatalogService>();
 builder.Services.AddScoped<IDeclarationDateAuthorizationService, DeclarationDateAuthorizationService>();
 builder.Services.AddSingleton<IWorkMenuService, StaticWorkMenuService>();
 

@@ -25,10 +25,10 @@
   - Pavimento
 - uso di pulsanti grandi per guidare l'operatore
 - azioni emerse dalle fonti:
-  - Linea Cassette: Dichiarazione produzione, Pulizia
-  - Linea Trapunte: Dichiarazione produzione, Setup 2F
-  - Linea Guanciali: Dichiarazione produzione, Pulizia
-  - Pavimento: Pulizia
+  - Linea Cassette: Dichiarazione produzione, Dichiarazione generica
+  - Linea Trapunte: Dichiarazione produzione, Dichiarazione generica
+  - Linea Guanciali: Dichiarazione produzione, Dichiarazione generica
+  - Pavimento: Dichiarazione generica
 
 ## Limiti volutamente non implementati in questo step
 - persistenza su database

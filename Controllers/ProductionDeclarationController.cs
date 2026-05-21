@@ -22,16 +22,17 @@ public class ProductionDeclarationController : Controller
             ["cassette-dichiarazione-produzione"] = new("cassette-dichiarazione-produzione", "Linea Kassetten", "Dichiarazione produzione", WorkFlowType.ProductionLaunches, "BED-RC"),
             ["trapunte-dichiarazione-produzione"] = new("trapunte-dichiarazione-produzione", "Linea Trapunte", "Dichiarazione produzione", WorkFlowType.ProductionLaunches, "BED-RT"),
             ["guanciali-dichiarazione-produzione"] = new("guanciali-dichiarazione-produzione", "Linea Guanciali", "Dichiarazione produzione", WorkFlowType.ProductionLaunches, "BED-G"),
-            ["cassette-pulizia"] = new("cassette-pulizia", "Linea Kassetten", "Pulizia", WorkFlowType.Screen4Direct, null),
-            ["guanciali-pulizia"] = new("guanciali-pulizia", "Linea Guanciali", "Pulizia", WorkFlowType.Screen4Direct, null),
-            ["pavimento-pulizia"] = new("pavimento-pulizia", "Pavimento", "Pulizia", WorkFlowType.Screen4Direct, null),
-            ["trapunte-setup-2f"] = new("trapunte-setup-2f", "Linea Trapunte", "Setup 2F", WorkFlowType.Screen4Direct, null)
+            ["cassette-dichiarazione-generica"] = new("cassette-dichiarazione-generica", "Linea Kassetten", "Dichiarazione generica", WorkFlowType.Screen4Direct, "BED-RC"),
+            ["guanciali-dichiarazione-generica"] = new("guanciali-dichiarazione-generica", "Linea Guanciali", "Dichiarazione generica", WorkFlowType.Screen4Direct, "BED-G"),
+            ["pavimento-dichiarazione-generica"] = new("pavimento-dichiarazione-generica", "Pavimento", "Dichiarazione generica", WorkFlowType.Screen4Direct, null),
+            ["trapunte-dichiarazione-generica"] = new("trapunte-dichiarazione-generica", "Linea Trapunte", "Dichiarazione generica", WorkFlowType.Screen4Direct, "BED-RT")
         };
 
     private readonly IOperatorCatalogService _operatorCatalogService;
     private readonly IWorkMenuService _workMenuService;
     private readonly IProductionLaunchService _productionLaunchService;
     private readonly IProductionDeclarationPersistenceService _productionDeclarationPersistenceService;
+    private readonly IDeclarationNoteTypeCatalogService _declarationNoteTypeCatalogService;
     private readonly IDeclarationDateAuthorizationService _declarationDateAuthorizationService;
 
     public ProductionDeclarationController(
@@ -39,12 +40,14 @@ public class ProductionDeclarationController : Controller
         IWorkMenuService workMenuService,
         IProductionLaunchService productionLaunchService,
         IProductionDeclarationPersistenceService productionDeclarationPersistenceService,
+        IDeclarationNoteTypeCatalogService declarationNoteTypeCatalogService,
         IDeclarationDateAuthorizationService declarationDateAuthorizationService)
     {
         _operatorCatalogService = operatorCatalogService;
         _workMenuService = workMenuService;
         _productionLaunchService = productionLaunchService;
         _productionDeclarationPersistenceService = productionDeclarationPersistenceService;
+        _declarationNoteTypeCatalogService = declarationNoteTypeCatalogService;
         _declarationDateAuthorizationService = declarationDateAuthorizationService;
     }
 
@@ -552,6 +555,55 @@ public class ProductionDeclarationController : Controller
                 return View("Screen4", invalidDirectModel);
             }
 
+            DeclarationNoteTypeViewModel? selectedNoteType = null;
+            if (IsGenericDeclarationAction(actionDefinition))
+            {
+                selectedNoteType = ResolveSelectedNoteType(actionDefinition, selectedOperators, postModel, requireSelection: true, defaultToOther: true, out var noteValidationMessage);
+                if (selectedNoteType is null)
+                {
+                    var invalidDirectModel = BuildScreen4Model(actionDefinition, selectedOperators);
+                    ApplyPostedValues(invalidDirectModel, postModel);
+                    invalidDirectModel.ValidationMessage = noteValidationMessage;
+                    return View("Screen4", invalidDirectModel);
+                }
+
+                if (selectedNoteType.RequiresAnnotationText && string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription))
+                {
+                    var invalidDirectModel = BuildScreen4Model(actionDefinition, selectedOperators);
+                    ApplyPostedValues(invalidDirectModel, postModel);
+                    invalidDirectModel.ValidationMessage = "Inserisci il testo annotazione per la tipologia selezionata.";
+                    return View("Screen4", invalidDirectModel);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+            {
+                var directRequest = new ProductionDeclarationInsertRequest
+                {
+                    LineCode = actionDefinition.LineCode!,
+                    DeclarationDate = declarationDate,
+                    TimingMinutes = timingMinutesPerOperatorDirect * selectedOperators.Count,
+                    NoteTypeId = selectedNoteType?.Id,
+                    NoteMinutes = timingMinutesPerOperatorDirect * selectedOperators.Count,
+                    NoteDescription = selectedNoteType?.RequiresAnnotationText != true || string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
+                        ? null
+                        : postModel.GlobalProblemDescription.Trim(),
+                    OperatorIds = selectedOperators.Select(static item => item.Id).ToList()
+                };
+
+                try
+                {
+                    _productionDeclarationPersistenceService.InsertDirectDeclaration(directRequest);
+                }
+                catch (Exception ex)
+                {
+                    var invalidDirectModel = BuildScreen4Model(actionDefinition, selectedOperators);
+                    ApplyPostedValues(invalidDirectModel, postModel);
+                    invalidDirectModel.ValidationMessage = $"Non riesco a inserire l'operazione. {ex.Message}";
+                    return View("Screen4", invalidDirectModel);
+                }
+            }
+
             ClearCurrentFlow();
             TempData["StartSuccessMessage"] = "Operazione inserita correttamente.";
             return RedirectToAction(nameof(Start));
@@ -578,6 +630,43 @@ public class ProductionDeclarationController : Controller
             var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
             ApplyPostedValues(invalidModel, postModel);
             invalidModel.ValidationMessage = "Inserisci il timing prima di premere Inserisci.";
+            return View("Screen4", invalidModel);
+        }
+
+        var selectedProductionNoteType = ResolveSelectedNoteType(actionDefinition, selectedOperators, postModel, requireSelection: false, defaultToOther: false, out var productionNoteValidationMessage);
+        if (!string.IsNullOrWhiteSpace(productionNoteValidationMessage))
+        {
+            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
+            ApplyPostedValues(invalidModel, postModel);
+            invalidModel.ValidationMessage = productionNoteValidationMessage;
+            return View("Screen4", invalidModel);
+        }
+
+        var productionProblemMinutes = postModel.GetProblemMinutes();
+        var hasProductionProblem = postModel.SelectedNoteTypeId.GetValueOrDefault() > 0
+            || !string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
+            || productionProblemMinutes > 0;
+        if (hasProductionProblem && selectedProductionNoteType is null)
+        {
+            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
+            ApplyPostedValues(invalidModel, postModel);
+            invalidModel.ValidationMessage = "Seleziona un tipo nota per il blocco o l'anomalia.";
+            return View("Screen4", invalidModel);
+        }
+
+        if (hasProductionProblem && productionProblemMinutes <= 0)
+        {
+            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
+            ApplyPostedValues(invalidModel, postModel);
+            invalidModel.ValidationMessage = "Inserisci il timing del blocco o dell'anomalia.";
+            return View("Screen4", invalidModel);
+        }
+
+        if (selectedProductionNoteType?.RequiresAnnotationText == true && string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription))
+        {
+            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
+            ApplyPostedValues(invalidModel, postModel);
+            invalidModel.ValidationMessage = "Inserisci la descrizione per la tipologia selezionata.";
             return View("Screen4", invalidModel);
         }
 
@@ -643,10 +732,13 @@ public class ProductionDeclarationController : Controller
             LineCode = actionDefinition.LineCode!,
             DeclarationDate = declarationDate,
             TimingMinutes = totalWorkedMinutes,
-            AnomalyDescription = string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
+            NoteTypeId = selectedProductionNoteType?.Id,
+            AnomalyDescription = selectedProductionNoteType?.RequiresAnnotationText == true && !string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
+                ? postModel.GlobalProblemDescription.Trim()
+                : string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
                 ? null
                 : postModel.GlobalProblemDescription.Trim(),
-            AnomalyMinutes = postModel.GetProblemMinutes(),
+            AnomalyMinutes = productionProblemMinutes,
             OperatorIds = selectedOperators.Select(static item => item.Id).ToList(),
             PhaseCode = GetDeclarationPhaseCode(actionDefinition, postModel.ProductionMode),
             Rows = declaredRows
@@ -711,6 +803,32 @@ public class ProductionDeclarationController : Controller
             IsDeclarationDateEditable = isDateEditAuthorized,
             AutoFillMaxQuantityFromBarcode = autoFillMaxQuantityFromBarcode
         };
+
+        if (IsGenericDeclarationAction(actionDefinition))
+        {
+            try
+            {
+                model.AvailableNoteTypes = _declarationNoteTypeCatalogService.GetForGenericDeclarations().ToList();
+                model.SelectedNoteTypeId = ResolveDefaultOtherNoteType(model.AvailableNoteTypes)?.Id;
+            }
+            catch (Exception ex)
+            {
+                model.AvailableNoteTypes = [];
+                model.ValidationMessage = $"Non riesco a caricare i tipi nota da X_OE_PROD_DICH_TIPI_NOTE. {ex.Message}";
+            }
+        }
+        else if (actionDefinition.FlowType == WorkFlowType.ProductionLaunches)
+        {
+            try
+            {
+                model.AvailableNoteTypes = _declarationNoteTypeCatalogService.GetForProductionDeclarations().ToList();
+            }
+            catch (Exception ex)
+            {
+                model.AvailableNoteTypes = [];
+                model.ValidationMessage = $"Non riesco a caricare i tipi nota da X_OE_PROD_DICH_TIPI_NOTE. {ex.Message}";
+            }
+        }
 
         if (actionDefinition.FlowType != WorkFlowType.ProductionLaunches)
         {
@@ -822,6 +940,7 @@ public class ProductionDeclarationController : Controller
         model.TotalDeclared = model.SelectedLaunches.Sum(static item => item.QuantityDeclared ?? 0m);
         model.GlobalTimingHours = Math.Max(0, postModel.GlobalTimingHours);
         model.GlobalTimingMinutes = Math.Max(0, postModel.GlobalTimingMinutes);
+        model.SelectedNoteTypeId = postModel.SelectedNoteTypeId;
         model.GlobalProblemDescription = postModel.GlobalProblemDescription ?? string.Empty;
         model.GlobalProblemHours = Math.Max(0, postModel.GlobalProblemHours);
         model.GlobalProblemMinutes = Math.Max(0, postModel.GlobalProblemMinutes);
@@ -1084,6 +1203,62 @@ public class ProductionDeclarationController : Controller
     private static bool IsTrapunteProductionAction(WorkActionDefinition actionDefinition)
     {
         return string.Equals(actionDefinition.Id, "trapunte-dichiarazione-produzione", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGenericDeclarationAction(WorkActionDefinition actionDefinition)
+    {
+        return actionDefinition.Id.EndsWith("-dichiarazione-generica", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private DeclarationNoteTypeViewModel? ResolveSelectedNoteType(
+        WorkActionDefinition actionDefinition,
+        List<OperatorItemViewModel> selectedOperators,
+        Screen4InsertPostModel postModel,
+        bool requireSelection,
+        bool defaultToOther,
+        out string validationMessage)
+    {
+        validationMessage = string.Empty;
+        var model = BuildScreen4Model(actionDefinition, selectedOperators);
+        var noteTypes = model.AvailableNoteTypes;
+
+        if (noteTypes.Count == 0)
+        {
+            validationMessage = model.ValidationMessage
+                ?? "Non ci sono tipi nota disponibili nella tabella X_OE_PROD_DICH_TIPI_NOTE.";
+            return null;
+        }
+
+        var selectedNoteTypeId = postModel.SelectedNoteTypeId;
+        if ((!selectedNoteTypeId.HasValue || selectedNoteTypeId.Value <= 0) && defaultToOther)
+        {
+            selectedNoteTypeId = ResolveDefaultOtherNoteType(noteTypes)?.Id;
+        }
+
+        if (!selectedNoteTypeId.HasValue || selectedNoteTypeId.Value <= 0)
+        {
+            if (requireSelection)
+            {
+                validationMessage = "Seleziona un tipo nota prima di premere Inserisci.";
+            }
+
+            return null;
+        }
+
+        var selectedNoteType = noteTypes.FirstOrDefault(item => item.Id == selectedNoteTypeId.Value);
+        if (selectedNoteType is null)
+        {
+            validationMessage = "Il tipo nota selezionato non e presente nella tabella X_OE_PROD_DICH_TIPI_NOTE.";
+            return null;
+        }
+
+        return selectedNoteType;
+    }
+
+    private static DeclarationNoteTypeViewModel? ResolveDefaultOtherNoteType(IReadOnlyList<DeclarationNoteTypeViewModel> noteTypes)
+    {
+        return noteTypes.FirstOrDefault(static item => string.Equals(item.Description.Trim(), "Altro", StringComparison.OrdinalIgnoreCase))
+            ?? noteTypes.FirstOrDefault();
     }
 
     private static bool RequiresMaterialLotSelection(WorkActionDefinition actionDefinition, string? productionMode)

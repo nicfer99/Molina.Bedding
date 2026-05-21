@@ -817,6 +817,10 @@ a { text-decoration: none; }
     border: 1px solid #dde6f2;
 }
 
+.screen4-detail[hidden] {
+    display: none !important;
+}
+
 .screen4-detail strong {
     font-size: 1.3rem;
 }
@@ -1610,6 +1614,11 @@ a { text-decoration: none; }
     gap: 0.6rem;
 }
 
+.screen4-problem-editor[hidden],
+.screen4-detail--note-description[hidden] {
+    display: none !important;
+}
+
 .screen4-problem-label {
     font-size: 1rem;
     font-weight: 800;
@@ -1724,6 +1733,32 @@ a { text-decoration: none; }
 .screen4-summary-bar--screen4 .screen4-detail--problem-global {
     flex: 0 0 320px;
     width: 320px;
+}
+
+.screen4-note-type-select {
+    width: 100%;
+    min-width: 260px;
+}
+
+.screen4-problem-note-type {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.screen4-problem-note-type .screen4-note-type-select {
+    min-width: min(100%, 360px);
+}
+
+.screen4-summary-bar--screen4 .screen4-detail--note-description {
+    flex: 1 1 680px;
+    width: 100%;
+    min-height: 260px;
+}
+
+.screen4-detail--note-description .screen4-problem-textarea {
+    min-height: 150px;
+    font-size: 1rem;
 }
 
 .screen4-summary-bar--screen4 .screen4-detail-label,

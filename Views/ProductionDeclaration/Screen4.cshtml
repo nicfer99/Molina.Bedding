@@ -11,6 +11,11 @@
     var lineDisplayTitle = string.IsNullOrWhiteSpace(Model.LineDisplayName) || string.Equals(Model.LineDisplayName, Model.AreaTitle, System.StringComparison.OrdinalIgnoreCase)
         ? Model.AreaTitle
         : $"{Model.AreaTitle} - {Model.LineDisplayName}";
+    var isGenericDeclaration = Model.ActionId.EndsWith("-dichiarazione-generica", System.StringComparison.OrdinalIgnoreCase);
+    var isClassicDeclaration = !isGenericDeclaration && Model.ActionId.EndsWith("-dichiarazione-produzione", System.StringComparison.OrdinalIgnoreCase);
+    var selectedNoteType = Model.AvailableNoteTypes.FirstOrDefault(noteType => Model.SelectedNoteTypeId == noteType.Id);
+    var selectedNoteRequiresAnnotation = selectedNoteType?.RequiresAnnotationText == true;
+    var showClassicNoteTypeSelect = isClassicDeclaration && Model.AvailableNoteTypes.Count > 0;
 }
 
 <section class="page-section page-section--wide page-section--screen4"
@@ -111,6 +116,25 @@
                         <input type="hidden" name="GlobalTimingMinutes" value="@Model.GlobalTimingMinutes" data-global-timing-minutes-hidden="true" />
                     </div>
                 </div>
+
+                @if (isGenericDeclaration && Model.SelectedNoteTypeId.HasValue)
+                {
+                    <input type="hidden" name="SelectedNoteTypeId" value="@Model.SelectedNoteTypeId.Value" />
+                }
+
+                @if (isGenericDeclaration && selectedNoteRequiresAnnotation)
+                {
+                    <div class="screen4-detail screen4-detail--problem-global screen4-detail--note-description" data-note-description-field="true">
+                        <span class="screen4-detail-label">Annotazione</span>
+                        <div class="screen4-global-problem-box">
+                            <textarea name="GlobalProblemDescription"
+                                      class="screen4-problem-textarea"
+                                      data-note-description-input="true"
+                                      rows="6"
+                                      placeholder="Inserisci il testo annotazione">@Model.GlobalProblemDescription</textarea>
+                        </div>
+                    </div>
+                }
 
                 @if (!Model.IsTimingOnlyMode)
                 {
@@ -569,9 +593,31 @@
             </button>
         </div>
 
-        <div class="screen4-problem-editor">
+        @if (showClassicNoteTypeSelect)
+        {
+            <div class="screen4-problem-note-type">
+                <label class="screen4-problem-label" for="screen4ProblemNoteType">Tipo nota</label>
+                <select id="screen4ProblemNoteType"
+                        name="SelectedNoteTypeId"
+                        form="screen4InsertForm"
+                        class="screen4-date-input screen4-note-type-select"
+                        data-note-type-select="true">
+                    <option value="">Seleziona tipo nota</option>
+                    @foreach (var noteType in Model.AvailableNoteTypes)
+                    {
+                        <option value="@noteType.Id"
+                                data-requires-annotation="@noteType.RequiresAnnotationText.ToString().ToLowerInvariant()"
+                                selected="@(Model.SelectedNoteTypeId == noteType.Id ? "selected" : null)">
+                            @noteType.Description
+                        </option>
+                    }
+                </select>
+            </div>
+        }
+
+        <div class="screen4-problem-editor" data-note-description-field="true" @(showClassicNoteTypeSelect && selectedNoteRequiresAnnotation ? null : "hidden")>
             <label class="screen4-problem-label" for="screen4ProblemDescription">Descrizione blocco o anomalia</label>
-            <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata"></textarea>
+            <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" data-note-description-input="true" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata"></textarea>
         </div>
 
         <div class="screen4-time-display-panel screen4-time-display-panel--problem">

@@ -1779,6 +1779,7 @@
         const problemDisplayElement = document.getElementById("screen4ProblemModalDisplay");
         const problemHoursValueElement = document.getElementById("screen4ProblemHoursValue");
         const problemDescriptionInput = document.getElementById("screen4ProblemDescription");
+        const confirmProblemButton = problemModal ? problemModal.querySelector("[data-confirm-problem='true']") : null;
         const globalProblemSummaryElement = page.querySelector("[data-global-problem-summary='true']");
         const globalProblemSummaryTextElement = page.querySelector("[data-global-problem-summary-text='true']");
         const globalProblemDescriptionHiddenElement = page.querySelector("[data-global-problem-description-hidden='true']");
@@ -1786,6 +1787,9 @@
         const globalProblemHoursHiddenElement = page.querySelector("[data-global-problem-hours-hidden='true']");
         const globalProblemMinutesHiddenElement = page.querySelector("[data-global-problem-minutes-hidden='true']");
         const globalProblemClearButton = page.querySelector("[data-clear-global-problem='true']");
+        const noteTypeSelectElement = problemModal ? problemModal.querySelector("[data-note-type-select='true']") : null;
+        const noteDescriptionFieldElement = problemModal ? problemModal.querySelector("[data-note-description-field='true']") : null;
+        const noteDescriptionInputElement = problemModal ? problemModal.querySelector("[data-note-description-input='true']") : null;
         const slotCards = Array.from(page.querySelectorAll("[data-screen4-slot='true']"));
         const insertButton = document.getElementById("screen4InsertButton");
         const isTimingOnlyMode = (page.getAttribute("data-timing-only-mode") || "").toLowerCase() === "true";
@@ -2033,7 +2037,8 @@
             const safeHours = Math.max(0, Number(hours) || 0);
             const safeMinutes = Math.max(0, Number(minutes) || 0);
             const hasTiming = safeHours > 0 || safeMinutes > 0;
-            const hasProblem = !!safeDescription || hasTiming;
+            const noteTypeText = getSelectedNoteTypeText();
+            const hasProblem = !!noteTypeText || !!safeDescription || hasTiming;
 
             if (globalProblemDescriptionHiddenElement) {
                 globalProblemDescriptionHiddenElement.value = safeDescription;
@@ -2059,6 +2064,9 @@
             }
 
             const summaryParts = [];
+            if (noteTypeText) {
+                summaryParts.push(noteTypeText);
+            }
             if (safeDescription) {
                 summaryParts.push(safeDescription);
             }
@@ -2070,6 +2078,83 @@
             globalProblemSummaryElement.classList.add("has-problem");
             if (globalProblemClearButton) {
                 globalProblemClearButton.classList.remove("is-hidden");
+            }
+        }
+
+        function syncNoteDescriptionField() {
+            if (!noteDescriptionFieldElement) {
+                return;
+            }
+
+            if (!noteTypeSelectElement) {
+                noteDescriptionFieldElement.hidden = true;
+                if (noteDescriptionInputElement) {
+                    noteDescriptionInputElement.disabled = true;
+                    noteDescriptionInputElement.required = false;
+                    noteDescriptionInputElement.value = "";
+                }
+                return;
+            }
+
+            const requiresAnnotation = selectedNoteTypeRequiresAnnotation();
+            noteDescriptionFieldElement.hidden = !requiresAnnotation;
+            if (noteDescriptionInputElement) {
+                noteDescriptionInputElement.disabled = !requiresAnnotation;
+                noteDescriptionInputElement.required = requiresAnnotation;
+                if (!requiresAnnotation) {
+                    noteDescriptionInputElement.value = "";
+                }
+            }
+
+            if (!requiresAnnotation && globalProblemDescriptionHiddenElement) {
+                updateGlobalProblemSummary("", problemHoursValue, problemMinutesValue);
+            }
+
+            syncProblemConfirmState();
+        }
+
+        function getSelectedNoteTypeOption() {
+            if (!noteTypeSelectElement || noteTypeSelectElement.selectedIndex < 0) {
+                return null;
+            }
+
+            return noteTypeSelectElement.options[noteTypeSelectElement.selectedIndex];
+        }
+
+        function getSelectedNoteTypeText() {
+            const selectedOption = getSelectedNoteTypeOption();
+            if (!selectedOption || !selectedOption.value) {
+                return "";
+            }
+
+            return (selectedOption.textContent || "").trim();
+        }
+
+        function selectedNoteTypeRequiresAnnotation() {
+            const selectedOption = getSelectedNoteTypeOption();
+            return !!selectedOption
+                && !!selectedOption.value
+                && (selectedOption.getAttribute("data-requires-annotation") || "").toLowerCase() === "true";
+        }
+
+        function hasSelectedProblemNoteType() {
+            return !noteTypeSelectElement || !!getSelectedNoteTypeText();
+        }
+
+        function hasProblemTiming() {
+            return problemHoursValue > 0 || problemMinutesValue > 0;
+        }
+
+        function canConfirmProblemValue() {
+            const description = problemDescriptionInput ? problemDescriptionInput.value.trim() : "";
+            return hasSelectedProblemNoteType()
+                && hasProblemTiming()
+                && (!selectedNoteTypeRequiresAnnotation() || !!description);
+        }
+
+        function syncProblemConfirmState() {
+            if (confirmProblemButton) {
+                confirmProblemButton.disabled = !canConfirmProblemValue();
             }
         }
 
@@ -2453,6 +2538,7 @@
                     button.classList.toggle("is-active", minuteValue === problemMinutesValue);
                 });
             }
+            syncProblemConfirmState();
         }
 
         function openProblemModal() {
@@ -2468,6 +2554,7 @@
             if (problemDescriptionInput) {
                 problemDescriptionInput.value = globalProblemDescriptionHiddenElement ? globalProblemDescriptionHiddenElement.value : "";
             }
+            syncNoteDescriptionField();
             syncProblemModalDisplay();
             problemModal.hidden = false;
             refreshBodyModalState();
@@ -2489,8 +2576,19 @@
 
         function confirmProblemValue() {
             const description = problemDescriptionInput ? problemDescriptionInput.value.trim() : "";
-            if (!description && problemHoursValue === 0 && problemMinutesValue === 0) {
-                showToast("Inserisci una descrizione oppure un timing del blocco o dell'anomalia.", "warning");
+            const selectedNoteTypeText = getSelectedNoteTypeText();
+            if (!hasSelectedProblemNoteType()) {
+                showToast("Seleziona un tipo nota prima di confermare il blocco o l'anomalia.", "warning");
+                return;
+            }
+
+            if (!hasProblemTiming()) {
+                showToast("Inserisci il timing del blocco o dell'anomalia prima di confermare.", "warning");
+                return;
+            }
+
+            if (selectedNoteTypeRequiresAnnotation() && !description) {
+                showToast("Inserisci la descrizione per la tipologia selezionata.", "warning");
                 return;
             }
 
@@ -2499,8 +2597,22 @@
             showToast("Blocco o anomalia aggiornato.", "success");
         }
 
-        function clearProblemValue() {
+        function resetProblemValue() {
+            if (noteTypeSelectElement) {
+                noteTypeSelectElement.value = "";
+            }
+            if (problemDescriptionInput) {
+                problemDescriptionInput.value = "";
+            }
+            problemHoursValue = 0;
+            problemMinutesValue = 0;
+            syncNoteDescriptionField();
+            syncProblemModalDisplay();
             updateGlobalProblemSummary("", 0, 0);
+        }
+
+        function clearProblemValue() {
+            resetProblemValue();
             closeProblemModal();
             showToast("Blocco o anomalia annullato.", "info");
         }
@@ -2760,7 +2872,7 @@
             globalProblemClearButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                updateGlobalProblemSummary("", 0, 0);
+                resetProblemValue();
                 showToast("Blocco o anomalia annullato.", "info");
             });
         }
@@ -2769,6 +2881,14 @@
             requestDateEditButton.addEventListener("click", function () {
                 requestDateEditAuthorization();
             });
+        }
+
+        if (noteTypeSelectElement) {
+            noteTypeSelectElement.addEventListener("change", function () {
+                syncNoteDescriptionField();
+                syncProblemConfirmState();
+            });
+            syncNoteDescriptionField();
         }
 
         if (datePinModal) {
@@ -3015,10 +3135,15 @@
                 });
             });
 
-            const confirmProblemButton = problemModal.querySelector("[data-confirm-problem='true']");
             if (confirmProblemButton) {
                 confirmProblemButton.addEventListener("click", function () {
                     confirmProblemValue();
+                });
+            }
+
+            if (problemDescriptionInput) {
+                problemDescriptionInput.addEventListener("input", function () {
+                    syncProblemConfirmState();
                 });
             }
 
