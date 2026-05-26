@@ -1783,6 +1783,8 @@
         const globalProblemSummaryElement = page.querySelector("[data-global-problem-summary='true']");
         const globalProblemSummaryTextElement = page.querySelector("[data-global-problem-summary-text='true']");
         const globalProblemDescriptionHiddenElement = page.querySelector("[data-global-problem-description-hidden='true']");
+        const problemNotesHiddenElement = page.querySelector("[data-problem-notes-hidden='true']");
+        const problemNotesListElement = page.querySelector("[data-problem-notes-list='true']");
         const totalDeclaredValueElement = page.querySelector("[data-total-declared-value='true']");
         const globalProblemHoursHiddenElement = page.querySelector("[data-global-problem-hours-hidden='true']");
         const globalProblemMinutesHiddenElement = page.querySelector("[data-global-problem-minutes-hidden='true']");
@@ -1804,6 +1806,7 @@
         let timingMinutesValue = Number(globalTimingMinutesHiddenElement ? globalTimingMinutesHiddenElement.value : 0) || 0;
         let problemHoursValue = Number(globalProblemHoursHiddenElement ? globalProblemHoursHiddenElement.value : 0) || 0;
         let problemMinutesValue = Number(globalProblemMinutesHiddenElement ? globalProblemMinutesHiddenElement.value : 0) || 0;
+        let problemNotes = parseProblemNotesHidden();
         const confirmedOverLimitOrderIds = new Set(
             (confirmedOverLimitHiddenElement && confirmedOverLimitHiddenElement.value ? confirmedOverLimitHiddenElement.value.split(",") : [])
                 .map(function (value) { return value.trim(); })
@@ -2032,13 +2035,140 @@
             updateInsertButtonState();
         }
 
+        function parseProblemNotesHidden() {
+            if (!problemNotesHiddenElement || !problemNotesHiddenElement.value) {
+                return [];
+            }
+
+            try {
+                const parsedValue = JSON.parse(problemNotesHiddenElement.value);
+                if (!Array.isArray(parsedValue)) {
+                    return [];
+                }
+
+                return parsedValue
+                    .map(function (item) {
+                        return {
+                            noteTypeId: Math.max(0, Number(item.noteTypeId || item.NoteTypeId || 0) || 0),
+                            noteTypeText: String(item.noteTypeText || item.NoteTypeText || "").trim(),
+                            description: String(item.description || item.Description || "").trim(),
+                            hours: Math.max(0, Number(item.hours || item.Hours || 0) || 0),
+                            minutes: Math.max(0, Number(item.minutes || item.Minutes || 0) || 0)
+                        };
+                    })
+                    .filter(function (item) {
+                        return item.noteTypeId > 0 && (item.hours > 0 || item.minutes > 0 || !!item.description);
+                    });
+            } catch (_error) {
+                return [];
+            }
+        }
+
+        function getProblemNoteTotalMinutes(note) {
+            return Math.max(0, Number(note.hours) || 0) * 60 + Math.max(0, Number(note.minutes) || 0);
+        }
+
+        function syncProblemNotesSummary() {
+            if (problemNotesHiddenElement) {
+                problemNotesHiddenElement.value = JSON.stringify(problemNotes.map(function (note) {
+                    return {
+                        noteTypeId: note.noteTypeId,
+                        noteTypeText: note.noteTypeText,
+                        description: note.description,
+                        hours: Math.max(0, Number(note.hours) || 0),
+                        minutes: Math.max(0, Number(note.minutes) || 0)
+                    };
+                }));
+            }
+
+            const totalMinutes = problemNotes.reduce(function (sum, note) {
+                return sum + getProblemNoteTotalMinutes(note);
+            }, 0);
+            const hasProblems = problemNotes.length > 0;
+
+            if (globalProblemDescriptionHiddenElement) {
+                globalProblemDescriptionHiddenElement.value = problemNotes.map(function (note) {
+                    return note.description;
+                }).filter(Boolean).join("; ");
+            }
+            if (globalProblemHoursHiddenElement) {
+                globalProblemHoursHiddenElement.value = String(Math.floor(totalMinutes / 60));
+            }
+            if (globalProblemMinutesHiddenElement) {
+                globalProblemMinutesHiddenElement.value = String(totalMinutes % 60);
+            }
+
+            if (globalProblemSummaryElement && globalProblemSummaryTextElement) {
+                if (!hasProblems) {
+                    globalProblemSummaryTextElement.textContent = "Nessun blocco o anomalia";
+                    globalProblemSummaryElement.classList.remove("has-problem");
+                    if (globalProblemClearButton) {
+                        globalProblemClearButton.classList.add("is-hidden");
+                    }
+                } else {
+                    globalProblemSummaryTextElement.textContent = problemNotes.map(function (note) {
+                        const parts = [note.noteTypeText || "Blocco/anomalia"];
+                        if (note.description) {
+                            parts.push(note.description);
+                        }
+                        const noteMinutes = getProblemNoteTotalMinutes(note);
+                        if (noteMinutes > 0) {
+                            parts.push("(" + formatTimeDisplay(Math.floor(noteMinutes / 60), noteMinutes % 60) + ")");
+                        }
+                        return parts.join(" ");
+                    }).join("; ");
+                    globalProblemSummaryElement.classList.add("has-problem");
+                    if (globalProblemClearButton) {
+                        globalProblemClearButton.classList.remove("is-hidden");
+                    }
+                }
+            }
+
+            renderProblemNotesList();
+        }
+
+        function renderProblemNotesList() {
+            if (!problemNotesListElement) {
+                return;
+            }
+
+            problemNotesListElement.innerHTML = "";
+            if (problemNotes.length === 0) {
+                problemNotesListElement.hidden = true;
+                return;
+            }
+
+            problemNotesListElement.hidden = false;
+            problemNotes.forEach(function (note, index) {
+                const item = document.createElement("div");
+                item.className = "screen4-problem-list-item";
+
+                const text = document.createElement("span");
+                const noteMinutes = getProblemNoteTotalMinutes(note);
+                text.textContent = [
+                    note.noteTypeText || "Blocco/anomalia",
+                    note.description,
+                    noteMinutes > 0 ? formatTimeDisplay(Math.floor(noteMinutes / 60), noteMinutes % 60) : ""
+                ].filter(Boolean).join(" - ");
+
+                const removeButton = document.createElement("button");
+                removeButton.type = "button";
+                removeButton.className = "screen4-summary-clear";
+                removeButton.setAttribute("data-remove-problem-note-index", String(index));
+                removeButton.setAttribute("aria-label", "Rimuovi blocco o anomalia");
+                removeButton.title = "Rimuovi blocco o anomalia";
+                removeButton.textContent = "x";
+
+                item.appendChild(text);
+                item.appendChild(removeButton);
+                problemNotesListElement.appendChild(item);
+            });
+        }
+
         function updateGlobalProblemSummary(description, hours, minutes) {
             const safeDescription = String(description || "").trim();
             const safeHours = Math.max(0, Number(hours) || 0);
             const safeMinutes = Math.max(0, Number(minutes) || 0);
-            const hasTiming = safeHours > 0 || safeMinutes > 0;
-            const noteTypeText = getSelectedNoteTypeText();
-            const hasProblem = !!noteTypeText || !!safeDescription || hasTiming;
 
             if (globalProblemDescriptionHiddenElement) {
                 globalProblemDescriptionHiddenElement.value = safeDescription;
@@ -2050,35 +2180,7 @@
                 globalProblemMinutesHiddenElement.value = String(safeMinutes);
             }
 
-            if (!globalProblemSummaryElement || !globalProblemSummaryTextElement) {
-                return;
-            }
-
-            if (!hasProblem) {
-                globalProblemSummaryTextElement.textContent = "Nessun blocco o anomalia";
-                globalProblemSummaryElement.classList.remove("has-problem");
-                if (globalProblemClearButton) {
-                    globalProblemClearButton.classList.add("is-hidden");
-                }
-                return;
-            }
-
-            const summaryParts = [];
-            if (noteTypeText) {
-                summaryParts.push(noteTypeText);
-            }
-            if (safeDescription) {
-                summaryParts.push(safeDescription);
-            }
-            if (hasTiming) {
-                summaryParts.push("(" + formatTimeDisplay(safeHours, safeMinutes) + ")");
-            }
-
-            globalProblemSummaryTextElement.textContent = summaryParts.join(" ");
-            globalProblemSummaryElement.classList.add("has-problem");
-            if (globalProblemClearButton) {
-                globalProblemClearButton.classList.remove("is-hidden");
-            }
+            syncProblemNotesSummary();
         }
 
         function syncNoteDescriptionField() {
@@ -2128,6 +2230,15 @@
             }
 
             return (selectedOption.textContent || "").trim();
+        }
+
+        function getSelectedNoteTypeId() {
+            const selectedOption = getSelectedNoteTypeOption();
+            if (!selectedOption || !selectedOption.value) {
+                return 0;
+            }
+
+            return Number(selectedOption.value) || 0;
         }
 
         function selectedNoteTypeRequiresAnnotation() {
@@ -2546,13 +2657,16 @@
                 return;
             }
 
-            problemHoursValue = Number(globalProblemHoursHiddenElement ? globalProblemHoursHiddenElement.value : 0) || 0;
-            problemMinutesValue = Number(globalProblemMinutesHiddenElement ? globalProblemMinutesHiddenElement.value : 0) || 0;
+            problemHoursValue = 0;
+            problemMinutesValue = 0;
             if (problemLotElement) {
                 problemLotElement.textContent = "Valido per tutti i lotti selezionati";
             }
+            if (noteTypeSelectElement) {
+                noteTypeSelectElement.value = "";
+            }
             if (problemDescriptionInput) {
-                problemDescriptionInput.value = globalProblemDescriptionHiddenElement ? globalProblemDescriptionHiddenElement.value : "";
+                problemDescriptionInput.value = "";
             }
             syncNoteDescriptionField();
             syncProblemModalDisplay();
@@ -2576,6 +2690,7 @@
 
         function confirmProblemValue() {
             const description = problemDescriptionInput ? problemDescriptionInput.value.trim() : "";
+            const selectedNoteTypeId = getSelectedNoteTypeId();
             const selectedNoteTypeText = getSelectedNoteTypeText();
             if (!hasSelectedProblemNoteType()) {
                 showToast("Seleziona un tipo nota prima di confermare il blocco o l'anomalia.", "warning");
@@ -2592,12 +2707,20 @@
                 return;
             }
 
-            updateGlobalProblemSummary(description, problemHoursValue, problemMinutesValue);
+            problemNotes.push({
+                noteTypeId: selectedNoteTypeId,
+                noteTypeText: selectedNoteTypeText,
+                description: description,
+                hours: problemHoursValue,
+                minutes: problemMinutesValue
+            });
+            syncProblemNotesSummary();
             closeProblemModal();
-            showToast("Blocco o anomalia aggiornato.", "success");
+            showToast("Blocco o anomalia aggiunto.", "success");
         }
 
         function resetProblemValue() {
+            problemNotes = [];
             if (noteTypeSelectElement) {
                 noteTypeSelectElement.value = "";
             }
@@ -2873,7 +2996,25 @@
                 event.preventDefault();
                 event.stopPropagation();
                 resetProblemValue();
-                showToast("Blocco o anomalia annullato.", "info");
+                showToast("Blocchi e anomalie annullati.", "info");
+            });
+        }
+
+        if (problemNotesListElement) {
+            problemNotesListElement.addEventListener("click", function (event) {
+                const removeButton = event.target.closest("[data-remove-problem-note-index]");
+                if (!removeButton) {
+                    return;
+                }
+
+                const noteIndex = Number(removeButton.getAttribute("data-remove-problem-note-index") || -1);
+                if (noteIndex < 0 || noteIndex >= problemNotes.length) {
+                    return;
+                }
+
+                problemNotes.splice(noteIndex, 1);
+                syncProblemNotesSummary();
+                showToast("Blocco o anomalia rimosso.", "info");
             });
         }
 
@@ -2945,11 +3086,7 @@
         }
 
         updateGlobalTimingSummary(timingHoursValue, timingMinutesValue);
-        updateGlobalProblemSummary(
-            globalProblemDescriptionHiddenElement ? globalProblemDescriptionHiddenElement.value : "",
-            problemHoursValue,
-            problemMinutesValue
-        );
+        syncProblemNotesSummary();
         updateTotalDeclaredSummary();
         updateInsertButtonState();
         syncConfirmedOverLimitHidden();

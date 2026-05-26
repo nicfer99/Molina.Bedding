@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 
 namespace Molina.Bedding.Mvc.Models;
 
@@ -14,6 +15,7 @@ public class Screen4InsertPostModel
     public string GlobalProblemDescription { get; set; } = string.Empty;
     public int GlobalProblemHours { get; set; }
     public int GlobalProblemMinutes { get; set; }
+    public string ProblemNotesJson { get; set; } = "[]";
     public List<Screen4InsertRowPostItemModel> Rows { get; set; } = [];
 
     public int GetTimingMinutesPerOperator()
@@ -24,6 +26,37 @@ public class Screen4InsertPostModel
     public int GetProblemMinutes()
     {
         return Math.Max(0, GlobalProblemHours) * 60 + Math.Max(0, GlobalProblemMinutes);
+    }
+
+    public IReadOnlyList<Screen4ProblemNotePostItemModel> GetProblemNotes()
+    {
+        if (string.IsNullOrWhiteSpace(ProblemNotesJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<Screen4ProblemNotePostItemModel>>(ProblemNotesJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            })?
+                .Where(static item => item.NoteTypeId > 0)
+                .Select(static item => new Screen4ProblemNotePostItemModel
+                {
+                    NoteTypeId = item.NoteTypeId,
+                    Description = item.Description?.Trim() ?? string.Empty,
+                    Hours = Math.Max(0, item.Hours),
+                    Minutes = Math.Max(0, item.Minutes)
+                })
+                .Where(static item => item.TotalMinutes > 0 || !string.IsNullOrWhiteSpace(item.Description))
+                .ToList()
+                ?? [];
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     public DateTime GetDeclarationDateOrDefault(DateTime defaultValue)
@@ -155,4 +188,13 @@ public class Screen4InsertRowPostItemModel
     public int OrderId { get; set; }
     public string QuantityDeclared { get; set; } = string.Empty;
     public string SelectedMaterialLotCode { get; set; } = string.Empty;
+}
+
+public class Screen4ProblemNotePostItemModel
+{
+    public int NoteTypeId { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public int Hours { get; set; }
+    public int Minutes { get; set; }
+    public int TotalMinutes => Math.Max(0, Hours) * 60 + Math.Max(0, Minutes);
 }

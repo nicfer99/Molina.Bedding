@@ -633,40 +633,29 @@ public class ProductionDeclarationController : Controller
             return View("Screen4", invalidModel);
         }
 
-        var selectedProductionNoteType = ResolveSelectedNoteType(actionDefinition, selectedOperators, postModel, requireSelection: false, defaultToOther: false, out var productionNoteValidationMessage);
+        var productionNotes = postModel.GetProblemNotes().ToList();
+        var availableProductionNoteTypes = new List<DeclarationNoteTypeViewModel>();
+        if (productionNotes.Count > 0)
+        {
+            try
+            {
+                availableProductionNoteTypes = _declarationNoteTypeCatalogService.GetForProductionDeclarations().ToList();
+            }
+            catch (Exception ex)
+            {
+                var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
+                ApplyPostedValues(invalidModel, postModel);
+                invalidModel.ValidationMessage = $"Non riesco a caricare i tipi nota da X_OE_PROD_DICH_TIPI_NOTE. {ex.Message}";
+                return View("Screen4", invalidModel);
+            }
+        }
+
+        var normalizedProductionNotes = NormalizeProductionNotes(productionNotes, availableProductionNoteTypes, out var productionNoteValidationMessage);
         if (!string.IsNullOrWhiteSpace(productionNoteValidationMessage))
         {
             var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
             ApplyPostedValues(invalidModel, postModel);
             invalidModel.ValidationMessage = productionNoteValidationMessage;
-            return View("Screen4", invalidModel);
-        }
-
-        var productionProblemMinutes = postModel.GetProblemMinutes();
-        var hasProductionProblem = postModel.SelectedNoteTypeId.GetValueOrDefault() > 0
-            || !string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
-            || productionProblemMinutes > 0;
-        if (hasProductionProblem && selectedProductionNoteType is null)
-        {
-            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
-            ApplyPostedValues(invalidModel, postModel);
-            invalidModel.ValidationMessage = "Seleziona un tipo nota per il blocco o l'anomalia.";
-            return View("Screen4", invalidModel);
-        }
-
-        if (hasProductionProblem && productionProblemMinutes <= 0)
-        {
-            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
-            ApplyPostedValues(invalidModel, postModel);
-            invalidModel.ValidationMessage = "Inserisci il timing del blocco o dell'anomalia.";
-            return View("Screen4", invalidModel);
-        }
-
-        if (selectedProductionNoteType?.RequiresAnnotationText == true && string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription))
-        {
-            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
-            ApplyPostedValues(invalidModel, postModel);
-            invalidModel.ValidationMessage = "Inserisci la descrizione per la tipologia selezionata.";
             return View("Screen4", invalidModel);
         }
 
@@ -732,13 +721,7 @@ public class ProductionDeclarationController : Controller
             LineCode = actionDefinition.LineCode!,
             DeclarationDate = declarationDate,
             TimingMinutes = totalWorkedMinutes,
-            NoteTypeId = selectedProductionNoteType?.Id,
-            AnomalyDescription = selectedProductionNoteType?.RequiresAnnotationText == true && !string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
-                ? postModel.GlobalProblemDescription.Trim()
-                : string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
-                ? null
-                : postModel.GlobalProblemDescription.Trim(),
-            AnomalyMinutes = productionProblemMinutes,
+            Notes = normalizedProductionNotes,
             OperatorIds = selectedOperators.Select(static item => item.Id).ToList(),
             PhaseCode = GetDeclarationPhaseCode(actionDefinition, postModel.ProductionMode),
             Rows = declaredRows
@@ -898,6 +881,73 @@ public class ProductionDeclarationController : Controller
         return model;
     }
 
+    private static IReadOnlyList<ProductionDeclarationNoteRequest> NormalizeProductionNotes(
+        IReadOnlyList<Screen4ProblemNotePostItemModel> postedNotes,
+        IReadOnlyList<DeclarationNoteTypeViewModel> availableNoteTypes,
+        out string validationMessage)
+    {
+        validationMessage = string.Empty;
+        if (postedNotes.Count == 0)
+        {
+            return [];
+        }
+
+        var noteTypeLookup = availableNoteTypes.ToDictionary(static item => item.Id);
+        var normalizedNotes = new List<ProductionDeclarationNoteRequest>();
+
+        foreach (var note in postedNotes)
+        {
+            if (!noteTypeLookup.TryGetValue(note.NoteTypeId, out var noteType))
+            {
+                validationMessage = "Il tipo nota selezionato non e presente nella tabella X_OE_PROD_DICH_TIPI_NOTE.";
+                return [];
+            }
+
+            if (note.TotalMinutes <= 0)
+            {
+                validationMessage = "Inserisci il timing per ogni blocco o anomalia.";
+                return [];
+            }
+
+            var normalizedDescription = note.Description?.Trim();
+            if (noteType.RequiresAnnotationText && string.IsNullOrWhiteSpace(normalizedDescription))
+            {
+                validationMessage = "Inserisci la descrizione per ogni tipologia che richiede annotazione.";
+                return [];
+            }
+
+            normalizedNotes.Add(new ProductionDeclarationNoteRequest
+            {
+                NoteTypeId = note.NoteTypeId,
+                Minutes = note.TotalMinutes,
+                Description = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription
+            });
+        }
+
+        return normalizedNotes
+            .GroupBy(static item => item.NoteTypeId)
+            .Select(static group => new ProductionDeclarationNoteRequest
+            {
+                NoteTypeId = group.Key,
+                Minutes = group.Sum(static item => item.Minutes),
+                Description = JoinDescriptions(group.Select(static item => item.Description))
+            })
+            .ToList();
+    }
+
+    private static string? JoinDescriptions(IEnumerable<string?> descriptions)
+    {
+        var normalizedDescriptions = descriptions
+            .Select(static value => value?.Trim())
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return normalizedDescriptions.Count == 0
+            ? null
+            : string.Join("; ", normalizedDescriptions);
+    }
+
     private void ApplyProducedQuantities(WorkActionDefinition actionDefinition, string? productionMode, IList<ProductionLaunchItemViewModel> launches)
     {
         if (launches.Count == 0 || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
@@ -942,6 +992,7 @@ public class ProductionDeclarationController : Controller
         model.GlobalProblemDescription = postModel.GlobalProblemDescription ?? string.Empty;
         model.GlobalProblemHours = Math.Max(0, postModel.GlobalProblemHours);
         model.GlobalProblemMinutes = Math.Max(0, postModel.GlobalProblemMinutes);
+        model.ProblemNotesJson = string.IsNullOrWhiteSpace(postModel.ProblemNotesJson) ? "[]" : postModel.ProblemNotesJson;
         model.DeclarationDate = postModel.GetDeclarationDateOrDefault(model.DeclarationDate);
         model.ProductionMode = postModel.ProductionMode ?? string.Empty;
         model.ConfirmedOverLimitOrderIds = postModel.ConfirmedOverLimitOrderIds ?? string.Empty;

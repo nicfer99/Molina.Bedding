@@ -80,12 +80,10 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
             OUTER APPLY (
                 SELECT
                     STUFF((
-                        SELECT '; ' + COALESCE(NULLIF(noteInner.des_nota, ''), noteTypeInner.des_dichiarazione_tipo_nota, '')
+                        SELECT '; ' + ISNULL(noteInner.des_nota, '')
                         FROM [dbo].[X_OR_PROD_DICH_NOTE] noteInner
-                        LEFT JOIN [dbo].[X_OE_PROD_DICH_TIPI_NOTE] noteTypeInner
-                            ON noteTypeInner.prg_dichiarazione_tipo_nota = noteInner.prg_dichiarazione_tipo_nota
                         WHERE noteInner.prg_dichiarazione = d.prg_dichiarazione
-                            AND COALESCE(NULLIF(noteInner.des_nota, ''), noteTypeInner.des_dichiarazione_tipo_nota, '') <> ''
+                            AND ISNULL(noteInner.des_nota, '') <> ''
                         ORDER BY noteInner.prg_dichiarazione_tipo_nota
                         FOR XML PATH(''), TYPE
                     ).value('.', 'nvarchar(max)'), 1, 2, '') AS des_nota,
@@ -251,13 +249,11 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
                 request,
                 timestamp,
                 hasPhaseCodeColumn);
-            InsertDeclarationNote(
+            InsertDeclarationNotes(
                 connection,
                 transaction,
                 declarationId,
-                request.NoteTypeId,
-                request.AnomalyDescription,
-                request.AnomalyMinutes);
+                request.Notes);
             InsertDeclarationOperators(connection, transaction, declarationId, request.OperatorIds);
             var hasDeclaredQuantityColumn = HasQtaDichiarataColumn(connection, transaction);
             InsertDeclarationRows(connection, transaction, declarationId, request.Rows, request.TimingMinutes, hasDeclaredQuantityColumn);
@@ -495,6 +491,29 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         command.Parameters.Add(new SqlParameter("@noteDescription", (object?)normalizedDescription ?? DBNull.Value));
         command.Parameters.Add(new SqlParameter("@noteMinutes", normalizedMinutes));
         command.ExecuteNonQuery();
+    }
+
+    private static void InsertDeclarationNotes(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        int declarationId,
+        IReadOnlyList<ProductionDeclarationNoteRequest> notes)
+    {
+        if (notes.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var note in notes)
+        {
+            InsertDeclarationNote(
+                connection,
+                transaction,
+                declarationId,
+                note.NoteTypeId,
+                note.Description,
+                note.Minutes);
+        }
     }
 
     private static void InsertDeclarationOperators(SqlConnection connection, SqlTransaction transaction, int declarationId, IReadOnlyList<int> operatorIds)

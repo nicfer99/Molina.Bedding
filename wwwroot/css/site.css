@@ -1473,6 +1473,36 @@ a { text-decoration: none; }
     color: #9a3412;
 }
 
+.screen4-problem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.screen4-problem-list[hidden] {
+    display: none;
+}
+
+.screen4-problem-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    background: #fffaf4;
+    color: #9a3412;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.screen4-problem-list-item .screen4-summary-clear {
+    width: 1.65rem;
+    height: 1.65rem;
+    font-size: 1.1rem;
+}
+
 
 .screen4-summary-clear {
     width: 2rem;

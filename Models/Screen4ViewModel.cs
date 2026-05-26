@@ -25,6 +25,7 @@ public class Screen4ViewModel
     public string GlobalProblemDescription { get; set; } = string.Empty;
     public int GlobalProblemHours { get; set; }
     public int GlobalProblemMinutes { get; set; }
+    public string ProblemNotesJson { get; set; } = "[]";
     public DateTime DeclarationDate { get; set; } = DateTime.Today;
     public bool CanRequestDateEdit { get; set; }
     public bool IsDeclarationDateEditable { get; set; }
