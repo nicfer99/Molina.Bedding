@@ -715,12 +715,14 @@ public class ProductionDeclarationController : Controller
         }
 
         var totalWorkedMinutes = timingMinutesPerOperator * selectedOperators.Count;
+        var totalAnomalyMinutes = normalizedProductionNotes.Sum(static note => note.Minutes);
 
         var request = new ProductionDeclarationInsertRequest
         {
             LineCode = actionDefinition.LineCode!,
             DeclarationDate = declarationDate,
             TimingMinutes = totalWorkedMinutes,
+            HeaderTimingMinutes = totalWorkedMinutes + totalAnomalyMinutes,
             Notes = normalizedProductionNotes,
             OperatorIds = selectedOperators.Select(static item => item.Id).ToList(),
             PhaseCode = GetDeclarationPhaseCode(actionDefinition, postModel.ProductionMode),
