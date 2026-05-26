@@ -906,9 +906,7 @@ public class ProductionDeclarationController : Controller
         }
 
         var producedByOrderId = _productionDeclarationPersistenceService
-            .GetPreviousDeclarationsByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), launches.Select(static item => item.OrderId).ToList())
-            .GroupBy(static item => item.OrderId)
-            .ToDictionary(static group => group.Key, static group => group.Sum(static item => item.DeclaredQuantity));
+            .GetProducedQuantitiesByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), launches.Select(static item => item.OrderId).ToList());
 
         foreach (var launch in launches)
         {

@@ -5,6 +5,7 @@ namespace Molina.Bedding.Mvc.Services;
 public interface IProductionDeclarationPersistenceService
 {
     IReadOnlyList<DeclarationHistoryItemViewModel> GetPreviousDeclarationsByOrderIds(string lineCode, string? phaseCode, IReadOnlyList<int> orderIds);
+    IReadOnlyDictionary<int, decimal> GetProducedQuantitiesByOrderIds(string lineCode, string? phaseCode, IReadOnlyList<int> orderIds);
     int InsertDeclaration(ProductionDeclarationInsertRequest request);
     int InsertDirectDeclaration(ProductionDeclarationInsertRequest request);
 }

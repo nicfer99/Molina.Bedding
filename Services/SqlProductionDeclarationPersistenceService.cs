@@ -144,6 +144,80 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         return items;
     }
 
+    public IReadOnlyDictionary<int, decimal> GetProducedQuantitiesByOrderIds(string lineCode, string? phaseCode, IReadOnlyList<int> orderIds)
+    {
+        var normalizedIds = orderIds
+            .Distinct()
+            .OrderBy(static value => value)
+            .ToList();
+
+        if (normalizedIds.Count == 0)
+        {
+            return new Dictionary<int, decimal>();
+        }
+
+        var parameterNames = new List<string>();
+        for (var index = 0; index < normalizedIds.Count; index++)
+        {
+            parameterNames.Add($"@orderId{index}");
+        }
+
+        using var connection = _dbConnectionFactory.CreateConnection();
+        connection.Open();
+
+        var hasDeclaredQuantityColumn = HasQtaDichiarataColumn(connection, null);
+        var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, null);
+        var normalizedLineCode = (lineCode ?? string.Empty).Trim();
+        var normalizedPhaseCode = (phaseCode ?? string.Empty).Trim();
+        var applyPhaseFilter = hasPhaseCodeColumn && !string.IsNullOrWhiteSpace(normalizedPhaseCode);
+        var baseWhereClause = $"d.cod_linea_produzione = @lineCode AND q.prg_ordine IN ({string.Join(", ", parameterNames)})";
+
+        if (applyPhaseFilter)
+        {
+            baseWhereClause += " AND ISNULL(d.cod_fase, '') = @phaseCode";
+        }
+
+        var declaredQuantityExpression = hasDeclaredQuantityColumn
+            ? "CASE WHEN ISNULL(q.qta_dichiarata, 0) <> 0 THEN q.qta_dichiarata ELSE q.qta_lavorata END"
+            : "ISNULL(q.qta_lavorata, 0)";
+
+        var sql = $"""
+            SELECT
+                q.prg_ordine,
+                CAST(SUM({declaredQuantityExpression}) AS decimal(10, 2)) AS qta_prodotta
+            FROM [dbo].[X_OE_PROD_DICH_QPR] q
+            INNER JOIN [dbo].[X_OE_PROD_DICH] d
+                ON d.prg_dichiarazione = q.prg_dichiarazione
+            WHERE {baseWhereClause}
+            GROUP BY q.prg_ordine
+            """;
+
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.Parameters.Add(new SqlParameter("@lineCode", normalizedLineCode));
+
+        if (applyPhaseFilter)
+        {
+            command.Parameters.Add(new SqlParameter("@phaseCode", normalizedPhaseCode));
+        }
+
+        for (var index = 0; index < normalizedIds.Count; index++)
+        {
+            command.Parameters.Add(new SqlParameter(parameterNames[index], normalizedIds[index]));
+        }
+
+        using var reader = command.ExecuteReader();
+        var producedByOrderId = new Dictionary<int, decimal>();
+        while (reader.Read())
+        {
+            producedByOrderId[Convert.ToInt32(reader["prg_ordine"])] = reader["qta_prodotta"] == DBNull.Value
+                ? 0m
+                : Convert.ToDecimal(reader["qta_prodotta"]);
+        }
+
+        return producedByOrderId;
+    }
+
     public int InsertDeclaration(ProductionDeclarationInsertRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.LineCode))
