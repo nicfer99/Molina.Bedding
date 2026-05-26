@@ -2105,18 +2105,16 @@
                     if (globalProblemClearButton) {
                         globalProblemClearButton.classList.add("is-hidden");
                     }
+                } else if (problemNotes.length === 1) {
+                    globalProblemSummaryTextElement.textContent = formatProblemNoteText(problemNotes[0]);
+                    globalProblemSummaryElement.classList.add("has-problem");
+                    if (globalProblemClearButton) {
+                        globalProblemClearButton.classList.remove("is-hidden");
+                    }
                 } else {
-                    globalProblemSummaryTextElement.textContent = problemNotes.map(function (note) {
-                        const parts = [note.noteTypeText || "Blocco/anomalia"];
-                        if (note.description) {
-                            parts.push(note.description);
-                        }
-                        const noteMinutes = getProblemNoteTotalMinutes(note);
-                        if (noteMinutes > 0) {
-                            parts.push("(" + formatTimeDisplay(Math.floor(noteMinutes / 60), noteMinutes % 60) + ")");
-                        }
-                        return parts.join(" ");
-                    }).join("; ");
+                    globalProblemSummaryTextElement.textContent = problemNotes.length
+                        + " blocchi/anomalie - "
+                        + formatTimeDisplay(Math.floor(totalMinutes / 60), totalMinutes % 60);
                     globalProblemSummaryElement.classList.add("has-problem");
                     if (globalProblemClearButton) {
                         globalProblemClearButton.classList.remove("is-hidden");
@@ -2127,13 +2125,25 @@
             renderProblemNotesList();
         }
 
+        function formatProblemNoteText(note) {
+            const parts = [note.noteTypeText || "Blocco/anomalia"];
+            if (note.description) {
+                parts.push(note.description);
+            }
+            const noteMinutes = getProblemNoteTotalMinutes(note);
+            if (noteMinutes > 0) {
+                parts.push("(" + formatTimeDisplay(Math.floor(noteMinutes / 60), noteMinutes % 60) + ")");
+            }
+            return parts.join(" ");
+        }
+
         function renderProblemNotesList() {
             if (!problemNotesListElement) {
                 return;
             }
 
             problemNotesListElement.innerHTML = "";
-            if (problemNotes.length === 0) {
+            if (problemNotes.length <= 1) {
                 problemNotesListElement.hidden = true;
                 return;
             }
@@ -2144,12 +2154,7 @@
                 item.className = "screen4-problem-list-item";
 
                 const text = document.createElement("span");
-                const noteMinutes = getProblemNoteTotalMinutes(note);
-                text.textContent = [
-                    note.noteTypeText || "Blocco/anomalia",
-                    note.description,
-                    noteMinutes > 0 ? formatTimeDisplay(Math.floor(noteMinutes / 60), noteMinutes % 60) : ""
-                ].filter(Boolean).join(" - ");
+                text.textContent = formatProblemNoteText(note);
 
                 const removeButton = document.createElement("button");
                 removeButton.type = "button";

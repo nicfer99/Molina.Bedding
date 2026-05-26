@@ -825,58 +825,90 @@ public class ProductionDeclarationController : Controller
             return model;
         }
 
+        List<ProductionLaunchItemViewModel> selectedLaunches;
         try
         {
-            var selectedLaunches = _productionLaunchService.GetOpenLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
-            var historyLookup = _productionDeclarationPersistenceService
+            selectedLaunches = _productionLaunchService.GetOpenLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
+        }
+        catch (Exception ex)
+        {
+            model.ValidationMessage = $"Non riesco a rileggere i lotti selezionati. {ex.Message}";
+            return model;
+        }
+
+        Dictionary<int, List<DeclarationHistoryItemViewModel>> historyLookup = [];
+        IReadOnlyDictionary<int, decimal> producedQuantities = new Dictionary<int, decimal>();
+        try
+        {
+            historyLookup = _productionDeclarationPersistenceService
                 .GetPreviousDeclarationsByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), selectedOrderIds)
                 .GroupBy(static item => item.OrderId)
                 .ToDictionary(static group => group.Key, static group => group.ToList());
-
-            model.SelectedLaunches = selectedLaunches
-                .Select(launch =>
-                {
-                    historyLookup.TryGetValue(launch.OrderId, out var historyItems);
-                    historyItems ??= [];
-                    var quantityProduced = historyItems.Sum(static item => item.DeclaredQuantity);
-
-                    var availableMaterialLots = launch.AvailableMaterialLots.ToList();
-                    return new Screen4SelectedLaunchViewModel
-                    {
-                        OrderId = launch.OrderId,
-                        LotCode = launch.LotCode,
-                        DocumentNumber = launch.DocumentNumber,
-                        QuantityToProduce = launch.QuantityToProduce,
-                        QuantityProduced = quantityProduced,
-                        QuantityDeclared = null,
-                        SelectedMaterialLotCode = model.RequiresMaterialLotSelection
-                            ? ResolveSelectedOrAutoMaterialLotCode(null, availableMaterialLots)
-                            : string.Empty,
-                        ArticleCode = launch.ArticleCode,
-                        AvailableMaterialLots = availableMaterialLots,
-                        MaterialLotValidationMessage = launch.MaterialLotValidationMessage,
-                        HasPreviousDeclarations = quantityProduced > 0m && historyItems.Count > 0,
-                        PreviousDeclarations = historyItems
-                    };
-                })
-                .ToList();
-
-            model.LineDisplayName = selectedLaunches
-                .Select(static launch => launch.LineDescription)
-                .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value))
-                ?? model.LineDisplayName;
-
-            model.ValidationMessage = selectedLaunches
-                .Select(static launch => launch.MaterialLotValidationMessage)
-                .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
-
-            ApplyLaunchPrefillSelections(model);
-            model.TotalDeclared = model.SelectedLaunches.Sum(static item => item.QuantityDeclared ?? 0m);
         }
-        catch
+        catch (Exception ex)
         {
-            model.ValidationMessage = "Non riesco a rileggere i lotti selezionati.";
+            model.ValidationMessage = $"Non riesco a caricare lo storico dichiarazioni. {ex.Message}";
+            try
+            {
+                producedQuantities = _productionDeclarationPersistenceService
+                    .GetProducedQuantitiesByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), selectedOrderIds);
+            }
+            catch
+            {
+                producedQuantities = new Dictionary<int, decimal>();
+            }
         }
+
+        model.SelectedLaunches = selectedLaunches
+            .Select(launch =>
+            {
+                historyLookup.TryGetValue(launch.OrderId, out var historyItems);
+                historyItems ??= [];
+                var quantityProduced = historyItems.Count > 0
+                    ? historyItems.Sum(static item => item.DeclaredQuantity)
+                    : producedQuantities.TryGetValue(launch.OrderId, out var producedQuantity)
+                        ? producedQuantity
+                        : 0m;
+
+                var availableMaterialLots = launch.AvailableMaterialLots.ToList();
+                return new Screen4SelectedLaunchViewModel
+                {
+                    OrderId = launch.OrderId,
+                    LotCode = launch.LotCode,
+                    DocumentNumber = launch.DocumentNumber,
+                    QuantityToProduce = launch.QuantityToProduce,
+                    QuantityProduced = quantityProduced,
+                    QuantityDeclared = null,
+                    SelectedMaterialLotCode = model.RequiresMaterialLotSelection
+                        ? ResolveSelectedOrAutoMaterialLotCode(null, availableMaterialLots)
+                        : string.Empty,
+                    ArticleCode = launch.ArticleCode,
+                    AvailableMaterialLots = availableMaterialLots,
+                    MaterialLotValidationMessage = launch.MaterialLotValidationMessage,
+                    HasPreviousDeclarations = quantityProduced > 0m && historyItems.Count > 0,
+                    PreviousDeclarations = historyItems
+                };
+            })
+            .ToList();
+
+        model.LineDisplayName = selectedLaunches
+            .Select(static launch => launch.LineDescription)
+            .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value))
+            ?? model.LineDisplayName;
+
+        var materialLotValidationMessage = selectedLaunches
+            .Select(static launch => launch.MaterialLotValidationMessage)
+            .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+
+        if (!string.IsNullOrWhiteSpace(materialLotValidationMessage))
+        {
+            model.ValidationMessage = string.IsNullOrWhiteSpace(model.ValidationMessage)
+                ? materialLotValidationMessage
+                : $"{model.ValidationMessage} {materialLotValidationMessage}";
+        }
+
+        ApplyLaunchPrefillSelections(model);
+        model.TotalDeclared = model.SelectedLaunches.Sum(static item => item.QuantityDeclared ?? 0m);
 
         return model;
     }
