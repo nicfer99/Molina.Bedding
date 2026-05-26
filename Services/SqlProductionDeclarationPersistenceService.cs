@@ -372,7 +372,7 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         }
         command.Parameters.Add(new SqlParameter("@declarationDate", timestamp.Date));
         command.Parameters.Add(new SqlParameter("@declarationDateTime", timestamp));
-        command.Parameters.Add(new SqlParameter("@workedMinutes", GetHeaderTimingMinutes(request)));
+        command.Parameters.Add(new SqlParameter("@workedMinutes", request.TimingMinutes));
         if (hasGenericDeclarationColumn)
         {
             command.Parameters.Add(new SqlParameter("@isGenericDeclaration", System.Data.SqlDbType.Bit) { Value = true });
@@ -431,16 +431,9 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         }
         command.Parameters.Add(new SqlParameter("@declarationDate", timestamp.Date));
         command.Parameters.Add(new SqlParameter("@declarationDateTime", timestamp));
-        command.Parameters.Add(new SqlParameter("@workedMinutes", GetHeaderTimingMinutes(request)));
+        command.Parameters.Add(new SqlParameter("@workedMinutes", request.TimingMinutes));
 
         return Convert.ToInt32(command.ExecuteScalar());
-    }
-
-    private static int GetHeaderTimingMinutes(ProductionDeclarationInsertRequest request)
-    {
-        return request.HeaderTimingMinutes > 0
-            ? request.HeaderTimingMinutes
-            : request.TimingMinutes;
     }
 
     private static void InsertDeclarationNote(
