@@ -38,6 +38,11 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
 
         var hasDeclaredQuantityColumn = HasQtaDichiarataColumn(connection, null);
         var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, null);
+        var hasDeclarationNoteTable = HasTable(connection, null, "dbo.X_OR_PROD_DICH_NOTE");
+        var hasDeclarationNoteDescriptionColumn = hasDeclarationNoteTable
+            && HasColumn(connection, null, "dbo.X_OR_PROD_DICH_NOTE", "des_nota");
+        var hasDeclarationNoteMinutesColumn = hasDeclarationNoteTable
+            && HasColumn(connection, null, "dbo.X_OR_PROD_DICH_NOTE", "num_minuta_nota");
         var normalizedLineCode = (lineCode ?? string.Empty).Trim();
         var normalizedPhaseCode = (phaseCode ?? string.Empty).Trim();
         var applyPhaseFilter = hasPhaseCodeColumn && !string.IsNullOrWhiteSpace(normalizedPhaseCode);
@@ -51,6 +56,10 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         var declaredQuantityExpression = hasDeclaredQuantityColumn
             ? "CAST(CASE WHEN ISNULL(q.qta_dichiarata, 0) <> 0 THEN q.qta_dichiarata ELSE q.qta_lavorata END AS decimal(10, 2))"
             : "CAST(ISNULL(q.qta_lavorata, 0) AS decimal(10, 2))";
+        var notesApplySql = BuildDeclarationNotesApplySql(
+            hasDeclarationNoteTable,
+            hasDeclarationNoteDescriptionColumn,
+            hasDeclarationNoteMinutesColumn);
 
         var sql = $"""
             SELECT
@@ -77,22 +86,7 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
                         FOR XML PATH(''), TYPE
                     ).value('.', 'nvarchar(max)'), 1, 2, '') AS des_operatori
             ) ops
-            OUTER APPLY (
-                SELECT
-                    STUFF((
-                        SELECT '; ' + ISNULL(noteInner.des_nota, '')
-                        FROM [dbo].[X_OR_PROD_DICH_NOTE] noteInner
-                        WHERE noteInner.prg_dichiarazione = d.prg_dichiarazione
-                            AND ISNULL(noteInner.des_nota, '') <> ''
-                        ORDER BY noteInner.prg_dichiarazione_tipo_nota
-                        FOR XML PATH(''), TYPE
-                    ).value('.', 'nvarchar(max)'), 1, 2, '') AS des_nota,
-                    (
-                        SELECT SUM(ISNULL(noteMinutesInner.num_minuta_nota, 0))
-                        FROM [dbo].[X_OR_PROD_DICH_NOTE] noteMinutesInner
-                        WHERE noteMinutesInner.prg_dichiarazione = d.prg_dichiarazione
-                    ) AS num_minuta_nota
-            ) notes
+            {notesApplySql}
             WHERE {baseWhereClause}
             ORDER BY q.prg_ordine, d.dat_dichiarazione_time DESC, d.prg_dichiarazione DESC
             """;
@@ -649,6 +643,73 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH_QPR', 'qta_dichiarata') IS NULL THEN 0 ELSE 1 END";
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static string BuildDeclarationNotesApplySql(
+        bool hasDeclarationNoteTable,
+        bool hasDeclarationNoteDescriptionColumn,
+        bool hasDeclarationNoteMinutesColumn)
+    {
+        if (!hasDeclarationNoteTable)
+        {
+            return """
+                OUTER APPLY (
+                    SELECT
+                        CAST('' AS nvarchar(max)) AS des_nota,
+                        CAST(0 AS int) AS num_minuta_nota
+                ) notes
+                """;
+        }
+
+        var descriptionExpression = hasDeclarationNoteDescriptionColumn
+            ? """
+                STUFF((
+                    SELECT '; ' + ISNULL(noteInner.des_nota, '')
+                    FROM [dbo].[X_OR_PROD_DICH_NOTE] noteInner
+                    WHERE noteInner.prg_dichiarazione = d.prg_dichiarazione
+                        AND ISNULL(noteInner.des_nota, '') <> ''
+                    ORDER BY noteInner.prg_dichiarazione_tipo_nota
+                    FOR XML PATH(''), TYPE
+                ).value('.', 'nvarchar(max)'), 1, 2, '')
+                """
+            : "CAST('' AS nvarchar(max))";
+
+        var minutesExpression = hasDeclarationNoteMinutesColumn
+            ? """
+                (
+                    SELECT SUM(ISNULL(noteMinutesInner.num_minuta_nota, 0))
+                    FROM [dbo].[X_OR_PROD_DICH_NOTE] noteMinutesInner
+                    WHERE noteMinutesInner.prg_dichiarazione = d.prg_dichiarazione
+                )
+                """
+            : "CAST(0 AS int)";
+
+        return $"""
+            OUTER APPLY (
+                SELECT
+                    {descriptionExpression} AS des_nota,
+                    {minutesExpression} AS num_minuta_nota
+            ) notes
+            """;
+    }
+
+    private static bool HasTable(SqlConnection connection, SqlTransaction? transaction, string tableName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN OBJECT_ID(@tableName, 'U') IS NULL THEN 0 ELSE 1 END";
+        command.Parameters.Add(new SqlParameter("@tableName", tableName));
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static bool HasColumn(SqlConnection connection, SqlTransaction? transaction, string tableName, string columnName)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH(@tableName, @columnName) IS NULL THEN 0 ELSE 1 END";
+        command.Parameters.Add(new SqlParameter("@tableName", tableName));
+        command.Parameters.Add(new SqlParameter("@columnName", columnName));
         return Convert.ToInt32(command.ExecuteScalar()) == 1;
     }
 
