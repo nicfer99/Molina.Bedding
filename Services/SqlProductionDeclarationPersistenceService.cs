@@ -237,12 +237,14 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
             var declarationDate = request.DeclarationDate.Date;
             var timestamp = declarationDate + now.TimeOfDay;
             var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, transaction);
+            var hasHeaderNoteMinutesColumn = HasHeaderNoteMinutesColumn(connection, transaction);
             var declarationId = InsertDeclarationHeader(
                 connection,
                 transaction,
                 request,
                 timestamp,
-                hasPhaseCodeColumn);
+                hasPhaseCodeColumn,
+                hasHeaderNoteMinutesColumn);
             InsertDeclarationNotes(
                 connection,
                 transaction,
@@ -290,12 +292,14 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
             var timestamp = declarationDate + now.TimeOfDay;
             var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, transaction);
             var hasGenericDeclarationColumn = HasGenericDeclarationColumn(connection, transaction);
+            var hasHeaderNoteMinutesColumn = HasHeaderNoteMinutesColumn(connection, transaction);
             var declarationId = InsertDirectDeclarationHeader(
                 connection,
                 transaction,
                 request,
                 timestamp,
                 hasPhaseCodeColumn,
+                hasHeaderNoteMinutesColumn,
                 hasGenericDeclarationColumn);
             InsertDeclarationNote(
                 connection,
@@ -321,6 +325,7 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         ProductionDeclarationInsertRequest request,
         DateTime timestamp,
         bool hasPhaseCodeColumn,
+        bool hasHeaderNoteMinutesColumn,
         bool hasGenericDeclarationColumn)
     {
         var columns = new List<string>
@@ -342,6 +347,12 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         {
             columns.Insert(1, "[cod_fase]");
             values.Insert(1, "@phaseCode");
+        }
+
+        if (hasHeaderNoteMinutesColumn)
+        {
+            columns.Add("[num_minuti_note]");
+            values.Add("@noteMinutesTotal");
         }
 
         if (hasGenericDeclarationColumn)
@@ -373,6 +384,10 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         command.Parameters.Add(new SqlParameter("@declarationDate", timestamp.Date));
         command.Parameters.Add(new SqlParameter("@declarationDateTime", timestamp));
         command.Parameters.Add(new SqlParameter("@workedMinutes", request.TimingMinutes));
+        if (hasHeaderNoteMinutesColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteMinutesTotal", GetHeaderNoteMinutes(request)));
+        }
         if (hasGenericDeclarationColumn)
         {
             command.Parameters.Add(new SqlParameter("@isGenericDeclaration", System.Data.SqlDbType.Bit) { Value = true });
@@ -386,7 +401,8 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         SqlTransaction transaction,
         ProductionDeclarationInsertRequest request,
         DateTime timestamp,
-        bool hasPhaseCodeColumn)
+        bool hasPhaseCodeColumn,
+        bool hasHeaderNoteMinutesColumn)
     {
         var columns = new List<string>
         {
@@ -407,6 +423,12 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         {
             columns.Insert(1, "[cod_fase]");
             values.Insert(1, "@phaseCode");
+        }
+
+        if (hasHeaderNoteMinutesColumn)
+        {
+            columns.Add("[num_minuti_note]");
+            values.Add("@noteMinutesTotal");
         }
 
         var sql = $"""
@@ -432,8 +454,19 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         command.Parameters.Add(new SqlParameter("@declarationDate", timestamp.Date));
         command.Parameters.Add(new SqlParameter("@declarationDateTime", timestamp));
         command.Parameters.Add(new SqlParameter("@workedMinutes", request.TimingMinutes));
+        if (hasHeaderNoteMinutesColumn)
+        {
+            command.Parameters.Add(new SqlParameter("@noteMinutesTotal", GetHeaderNoteMinutes(request)));
+        }
 
         return Convert.ToInt32(command.ExecuteScalar());
+    }
+
+    private static int GetHeaderNoteMinutes(ProductionDeclarationInsertRequest request)
+    {
+        return request.Notes.Count > 0
+            ? request.Notes.Sum(static note => Math.Max(0, note.Minutes))
+            : Math.Max(0, request.NoteMinutes);
     }
 
     private static void InsertDeclarationNote(
@@ -718,6 +751,14 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'cod_fase') IS NULL THEN 0 ELSE 1 END";
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static bool HasHeaderNoteMinutesColumn(SqlConnection connection, SqlTransaction? transaction)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH('dbo.X_OE_PROD_DICH', 'num_minuti_note') IS NULL THEN 0 ELSE 1 END";
         return Convert.ToInt32(command.ExecuteScalar()) == 1;
     }
 
