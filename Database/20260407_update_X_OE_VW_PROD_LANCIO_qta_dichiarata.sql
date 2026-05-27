@@ -25,6 +25,15 @@ SELECT TOP (100) PERCENT
          FROM dbo.X_OE_MAGAZZINO_MATRICOLE_T
          WHERE prg_ordine_qpr = dbo.OR_ORDINIT.prg_ordine
            AND ind_tipo_matricola = '1') END AS decimal(10, 2)) AS qta_evasa,
+    CAST(CASE WHEN
+        (SELECT SUM(qta_merce_netto)
+         FROM dbo.X_OE_MAGAZZINO_MATRICOLE_T
+         WHERE prg_ordine_qpr = dbo.OR_ORDINIT.prg_ordine
+           AND ind_tipo_matricola = '1') IS NULL THEN 0 ELSE
+        (SELECT SUM(qta_merce_netto)
+         FROM dbo.X_OE_MAGAZZINO_MATRICOLE_T
+         WHERE prg_ordine_qpr = dbo.OR_ORDINIT.prg_ordine
+           AND ind_tipo_matricola = '1') END AS decimal(10, 2)) AS qta_evasa_qpr,
     dbo.OR_ORDINIT.cod_dep_mov,
     dbo.X_OE_RIFPROD.prg_imp,
     dbo.X_OE_RIFPROD.prg_produzione_carico,
