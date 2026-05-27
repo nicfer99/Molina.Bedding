@@ -7,10 +7,11 @@ public class Screen4SelectedLaunchViewModel
     public string DocumentNumber { get; set; } = string.Empty;
     public decimal? QuantityToProduce { get; set; }
     public decimal QuantityEvaded { get; set; }
+    public decimal ClosedQuantityEvaded { get; set; }
     public decimal? QuantityProduced { get; set; }
     public decimal? QuantityDeclared { get; set; }
     public string StatusCode { get; set; } = string.Empty;
-    public bool IsClosed => QuantityEvaded > 0m;
+    public bool IsClosed => ClosedQuantityEvaded > 0m;
     public string SelectedMaterialLotCode { get; set; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
     public List<string> AvailableMaterialLots { get; set; } = [];
