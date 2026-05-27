@@ -38,11 +38,11 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
 
         var hasDeclaredQuantityColumn = HasQtaDichiarataColumn(connection, null);
         var hasPhaseCodeColumn = HasPhaseCodeColumn(connection, null);
-        var hasDeclarationNoteTable = HasTable(connection, null, "dbo.X_OR_PROD_DICH_NOTE");
+        var hasDeclarationNoteTable = HasTable(connection, null, "dbo.X_OE_PROD_DICH_NOTE");
         var hasDeclarationNoteDescriptionColumn = hasDeclarationNoteTable
-            && HasColumn(connection, null, "dbo.X_OR_PROD_DICH_NOTE", "des_nota");
+            && HasColumn(connection, null, "dbo.X_OE_PROD_DICH_NOTE", "des_nota");
         var hasDeclarationNoteMinutesColumn = hasDeclarationNoteTable
-            && HasColumn(connection, null, "dbo.X_OR_PROD_DICH_NOTE", "num_minuta_nota");
+            && HasColumn(connection, null, "dbo.X_OE_PROD_DICH_NOTE", "num_minuta_nota");
         var normalizedLineCode = (lineCode ?? string.Empty).Trim();
         var normalizedPhaseCode = (phaseCode ?? string.Empty).Trim();
         var applyPhaseFilter = hasPhaseCodeColumn && !string.IsNullOrWhiteSpace(normalizedPhaseCode);
@@ -494,7 +494,7 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
         }
 
         const string sql = """
-            INSERT INTO [dbo].[X_OR_PROD_DICH_NOTE]
+            INSERT INTO [dbo].[X_OE_PROD_DICH_NOTE]
             (
                 [prg_dichiarazione],
                 [prg_dichiarazione_tipo_nota],
@@ -699,7 +699,7 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
             ? """
                 STUFF((
                     SELECT '; ' + ISNULL(noteInner.des_nota, '')
-                    FROM [dbo].[X_OR_PROD_DICH_NOTE] noteInner
+                    FROM [dbo].[X_OE_PROD_DICH_NOTE] noteInner
                     WHERE noteInner.prg_dichiarazione = d.prg_dichiarazione
                         AND ISNULL(noteInner.des_nota, '') <> ''
                     ORDER BY noteInner.prg_dichiarazione_tipo_nota
@@ -712,7 +712,7 @@ public class SqlProductionDeclarationPersistenceService : IProductionDeclaration
             ? """
                 (
                     SELECT SUM(ISNULL(noteMinutesInner.num_minuta_nota, 0))
-                    FROM [dbo].[X_OR_PROD_DICH_NOTE] noteMinutesInner
+                    FROM [dbo].[X_OE_PROD_DICH_NOTE] noteMinutesInner
                     WHERE noteMinutesInner.prg_dichiarazione = d.prg_dichiarazione
                 )
                 """

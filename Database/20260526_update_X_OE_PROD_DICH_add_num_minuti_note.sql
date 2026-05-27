@@ -21,8 +21,8 @@ END
 GO
 
 IF COL_LENGTH('dbo.X_OE_PROD_DICH', 'num_minuti_note') IS NOT NULL
-    AND OBJECT_ID('dbo.X_OR_PROD_DICH_NOTE', 'U') IS NOT NULL
-    AND COL_LENGTH('dbo.X_OR_PROD_DICH_NOTE', 'num_minuta_nota') IS NOT NULL
+    AND OBJECT_ID('dbo.X_OE_PROD_DICH_NOTE', 'U') IS NOT NULL
+    AND COL_LENGTH('dbo.X_OE_PROD_DICH_NOTE', 'num_minuta_nota') IS NOT NULL
 BEGIN
     UPDATE d
     SET [num_minuti_note] = totals.num_minuti_note
@@ -32,7 +32,7 @@ BEGIN
         SELECT
             [prg_dichiarazione],
             SUM(ISNULL([num_minuta_nota], 0)) AS num_minuti_note
-        FROM [dbo].[X_OR_PROD_DICH_NOTE]
+        FROM [dbo].[X_OE_PROD_DICH_NOTE]
         GROUP BY [prg_dichiarazione]
     ) totals
         ON totals.[prg_dichiarazione] = d.[prg_dichiarazione]

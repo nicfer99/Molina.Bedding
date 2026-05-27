@@ -25,15 +25,15 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID('dbo.X_OR_PROD_DICH_NOTE', 'U') IS NULL
+IF OBJECT_ID('dbo.X_OE_PROD_DICH_NOTE', 'U') IS NULL
 BEGIN
-    CREATE TABLE [dbo].[X_OR_PROD_DICH_NOTE]
+    CREATE TABLE [dbo].[X_OE_PROD_DICH_NOTE]
     (
         [prg_dichiarazione] [int] NOT NULL,
         [prg_dichiarazione_tipo_nota] [int] NOT NULL,
         [des_nota] [varchar](255) NULL,
         [num_minuta_nota] [smallint] NOT NULL,
-        CONSTRAINT [X_OR_PROD_DICH_NOTE_PrimaryKey] PRIMARY KEY CLUSTERED
+        CONSTRAINT [X_OE_PROD_DICH_NOTE_PrimaryKey] PRIMARY KEY CLUSTERED
         (
             [prg_dichiarazione] ASC,
             [prg_dichiarazione_tipo_nota] ASC
@@ -42,12 +42,12 @@ BEGIN
 END
 GO
 
-IF OBJECT_ID('dbo.X_OR_PROD_DICH_NOTE', 'U') IS NOT NULL
-    AND COL_LENGTH('dbo.X_OR_PROD_DICH_NOTE', 'num_minuta_nota') IS NULL
+IF OBJECT_ID('dbo.X_OE_PROD_DICH_NOTE', 'U') IS NOT NULL
+    AND COL_LENGTH('dbo.X_OE_PROD_DICH_NOTE', 'num_minuta_nota') IS NULL
 BEGIN
-    ALTER TABLE [dbo].[X_OR_PROD_DICH_NOTE]
+    ALTER TABLE [dbo].[X_OE_PROD_DICH_NOTE]
         ADD [num_minuta_nota] [smallint] NOT NULL
-            CONSTRAINT [DF_X_OR_PROD_DICH_NOTE_num_minuta_nota] DEFAULT ((0));
+            CONSTRAINT [DF_X_OE_PROD_DICH_NOTE_num_minuta_nota] DEFAULT ((0));
 END
 GO
 
@@ -64,7 +64,7 @@ BEGIN
             ELSE N'ISNULL(d.[num_minuti_nota], 0)'
         END;
     DECLARE @migrationSql nvarchar(max) = N'
-        INSERT INTO [dbo].[X_OR_PROD_DICH_NOTE]
+        INSERT INTO [dbo].[X_OE_PROD_DICH_NOTE]
         (
             [prg_dichiarazione],
             [prg_dichiarazione_tipo_nota],
@@ -81,7 +81,7 @@ BEGIN
             AND NOT EXISTS
             (
                 SELECT 1
-                FROM [dbo].[X_OR_PROD_DICH_NOTE] existing
+                FROM [dbo].[X_OE_PROD_DICH_NOTE] existing
                 WHERE existing.[prg_dichiarazione] = d.[prg_dichiarazione]
                     AND existing.[prg_dichiarazione_tipo_nota] = d.[prg_dichiarazione_tipo_nota]
             );';
