@@ -2068,6 +2068,12 @@
             return Math.max(0, Number(note.hours) || 0) * 60 + Math.max(0, Number(note.minutes) || 0);
         }
 
+        function getProblemNotesTotalMinutes() {
+            return problemNotes.reduce(function (sum, note) {
+                return sum + getProblemNoteTotalMinutes(note);
+            }, 0);
+        }
+
         function syncProblemNotesSummary() {
             if (problemNotesHiddenElement) {
                 problemNotesHiddenElement.value = JSON.stringify(problemNotes.map(function (note) {
@@ -2081,9 +2087,7 @@
                 }));
             }
 
-            const totalMinutes = problemNotes.reduce(function (sum, note) {
-                return sum + getProblemNoteTotalMinutes(note);
-            }, 0);
+            const totalMinutes = getProblemNotesTotalMinutes();
             const hasProblems = problemNotes.length > 0;
 
             if (globalProblemDescriptionHiddenElement) {
@@ -2100,7 +2104,7 @@
 
             if (globalProblemSummaryElement && globalProblemSummaryTextElement) {
                 if (!hasProblems) {
-                    globalProblemSummaryTextElement.textContent = "Nessun blocco o anomalia";
+                    globalProblemSummaryTextElement.textContent = "Nessuna nota produzione o blocco";
                     globalProblemSummaryElement.classList.remove("has-problem");
                     if (globalProblemClearButton) {
                         globalProblemClearButton.classList.add("is-hidden");
@@ -2113,11 +2117,11 @@
                     }
                 } else {
                     globalProblemSummaryTextElement.textContent = problemNotes.length
-                        + " blocchi/anomalie - "
+                        + " note produzione/blocchi - "
                         + formatTimeDisplay(Math.floor(totalMinutes / 60), totalMinutes % 60);
                     globalProblemSummaryElement.classList.add("has-problem");
                     if (globalProblemClearButton) {
-                        globalProblemClearButton.classList.remove("is-hidden");
+                        globalProblemClearButton.classList.add("is-hidden");
                     }
                 }
             }
@@ -2126,7 +2130,7 @@
         }
 
         function formatProblemNoteText(note) {
-            const parts = [note.noteTypeText || "Blocco/anomalia"];
+            const parts = [note.noteTypeText || "Nota produzione/blocco"];
             if (note.description) {
                 parts.push(note.description);
             }
@@ -2160,8 +2164,8 @@
                 removeButton.type = "button";
                 removeButton.className = "screen4-summary-clear";
                 removeButton.setAttribute("data-remove-problem-note-index", String(index));
-                removeButton.setAttribute("aria-label", "Rimuovi blocco o anomalia");
-                removeButton.title = "Rimuovi blocco o anomalia";
+                removeButton.setAttribute("aria-label", "Rimuovi nota produzione o blocco");
+                removeButton.title = "Rimuovi nota produzione o blocco";
                 removeButton.textContent = "x";
 
                 item.appendChild(text);
@@ -2721,11 +2725,10 @@
             });
             syncProblemNotesSummary();
             closeProblemModal();
-            showToast("Blocco o anomalia aggiunto.", "success");
+            showToast("Nota produzione o blocco aggiunto.", "success");
         }
 
-        function resetProblemValue() {
-            problemNotes = [];
+        function resetProblemEditorValue() {
             if (noteTypeSelectElement) {
                 noteTypeSelectElement.value = "";
             }
@@ -2736,13 +2739,12 @@
             problemMinutesValue = 0;
             syncNoteDescriptionField();
             syncProblemModalDisplay();
-            updateGlobalProblemSummary("", 0, 0);
         }
 
         function clearProblemValue() {
-            resetProblemValue();
+            resetProblemEditorValue();
             closeProblemModal();
-            showToast("Blocco o anomalia annullato.", "info");
+            showToast("Inserimento nota produzione o blocco annullato.", "info");
         }
 
         function normalizeDatePinValue(value) {
@@ -3000,8 +3002,13 @@
             globalProblemClearButton.addEventListener("click", function (event) {
                 event.preventDefault();
                 event.stopPropagation();
-                resetProblemValue();
-                showToast("Blocchi e anomalie annullati.", "info");
+                if (problemNotes.length !== 1) {
+                    return;
+                }
+
+                problemNotes = [];
+                syncProblemNotesSummary();
+                showToast("Nota produzione o blocco rimossa.", "info");
             });
         }
 
@@ -3019,7 +3026,7 @@
 
                 problemNotes.splice(noteIndex, 1);
                 syncProblemNotesSummary();
-                showToast("Blocco o anomalia rimosso.", "info");
+                showToast("Nota produzione o blocco rimossa.", "info");
             });
         }
 
@@ -3310,6 +3317,15 @@
                 }
 
                 if (isTimingOnlyMode) {
+                    return;
+                }
+
+                const totalTimingMinutes = Math.max(0, Number(timingHoursValue) || 0) * 60
+                    + Math.max(0, Number(timingMinutesValue) || 0);
+                const totalProblemMinutes = getProblemNotesTotalMinutes();
+                if (totalProblemMinutes >= totalTimingMinutes) {
+                    event.preventDefault();
+                    showToast("Il timing totale deve essere maggiore della somma delle note produzione o blocchi.", "warning");
                     return;
                 }
 

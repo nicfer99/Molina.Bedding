@@ -659,6 +659,15 @@ public class ProductionDeclarationController : Controller
             return View("Screen4", invalidModel);
         }
 
+        var totalProductionNoteMinutes = normalizedProductionNotes.Sum(static note => note.Minutes);
+        if (totalProductionNoteMinutes >= timingMinutesPerOperator)
+        {
+            var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
+            ApplyPostedValues(invalidModel, postModel);
+            invalidModel.ValidationMessage = "Il timing totale deve essere maggiore della somma delle note produzione o blocchi.";
+            return View("Screen4", invalidModel);
+        }
+
         var selectedMaterialLots = postModel.GetSelectedMaterialLotByOrderId();
         var confirmedOverLimitOrderIds = postModel.GetConfirmedOverLimitOrderIds();
         var requiresMaterialLotSelection = RequiresMaterialLotSelection(actionDefinition, GetSelectedProductionMode());

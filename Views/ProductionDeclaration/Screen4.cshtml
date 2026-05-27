@@ -139,16 +139,16 @@
                 @if (!Model.IsTimingOnlyMode)
                 {
                     <div class="screen4-detail screen4-detail--problem-global">
-                        <span class="screen4-detail-label">Blocchi produzione o anomalie</span>
+                        <span class="screen4-detail-label">NOTE PRODUZIONE O BLOCCHI</span>
                         <div class="screen4-global-problem-box">
-                            <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" data-open-global-problem="true">Blocchi produzione o anomalie</button>
+                            <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" data-open-global-problem="true">Inserisci nota Produzione o blocco</button>
                             <div class="screen4-problem-summary screen4-problem-summary--global" data-global-problem-summary="true">
-                                <span data-global-problem-summary-text="true">Nessun blocco o anomalia</span>
+                                <span data-global-problem-summary-text="true">Nessuna nota produzione o blocco</span>
                                 <button type="button"
                                         class="screen4-summary-clear is-hidden"
                                         data-clear-global-problem="true"
-                                        aria-label="Annulla blocco o anomalia"
-                                        title="Annulla blocco o anomalia">
+                                        aria-label="Rimuovi nota produzione o blocco"
+                                        title="Rimuovi nota produzione o blocco">
                                     ×
                                 </button>
                             </div>
@@ -586,8 +586,8 @@
     <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4ProblemModalTitle">
         <div class="screen4-qty-modal__header">
             <div>
-                <div class="page-kicker">Blocchi produzione o anomalie</div>
-                <h2 id="screen4ProblemModalTitle">Aggiungi blocco o anomalia</h2>
+                <div class="page-kicker">Note produzione o blocchi</div>
+                <h2 id="screen4ProblemModalTitle">NOTE PRODUZIONE O BLOCCHI</h2>
                 <div class="screen4-modal-lot" id="screen4ProblemModalLot">Valido per tutti i lotti selezionati</div>
             </div>
             <button type="button" class="screen4-qty-modal__close" data-close-problem-modal="true" aria-label="Chiudi finestra">
