@@ -952,9 +952,6 @@ public class ProductionDeclarationController : Controller
                 var quantityProduced = launch.IsClosed
                     ? previouslyDeclaredQuantity
                     : launch.QuantityProduced ?? 0m;
-                var quantityToProduce = launch.IsClosed && launch.ClosedQuantityEvaded > 0m
-                    ? launch.ClosedQuantityEvaded
-                    : launch.QuantityToProduce;
 
                 var availableMaterialLots = launch.AvailableMaterialLots.ToList();
                 return new Screen4SelectedLaunchViewModel
@@ -962,9 +959,8 @@ public class ProductionDeclarationController : Controller
                     OrderId = launch.OrderId,
                     LotCode = launch.LotCode,
                     DocumentNumber = launch.DocumentNumber,
-                    QuantityToProduce = quantityToProduce,
+                    QuantityToProduce = launch.QuantityToProduce,
                     QuantityEvaded = launch.QuantityEvaded,
-                    ClosedQuantityEvaded = launch.ClosedQuantityEvaded,
                     QuantityProduced = quantityProduced,
                     QuantityDeclared = null,
                     StatusCode = launch.StatusCode,
@@ -1086,9 +1082,9 @@ public class ProductionDeclarationController : Controller
                 continue;
             }
 
-            if (launch.ClosedQuantityEvaded > 0m)
+            if (launch.QuantityEvaded > 0m)
             {
-                launch.QuantityToProduce = launch.ClosedQuantityEvaded;
+                launch.QuantityToProduce = launch.QuantityEvaded;
             }
 
             launch.QuantityProduced = producedByOrderId.TryGetValue(launch.OrderId, out var producedQuantity)
