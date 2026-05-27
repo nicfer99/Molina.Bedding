@@ -55,7 +55,11 @@
         </div>
     }
 
-    <form asp-action="Screen4FromLaunches" asp-controller="ProductionDeclaration" method="post" id="launchSelectionForm">
+    <form asp-action="Screen4FromLaunches"
+          asp-controller="ProductionDeclaration"
+          method="post"
+          id="launchSelectionForm"
+          data-add-launch-from-barcode-url="@Url.Action("AddLaunchFromBarcode", "ProductionDeclaration")">
         @Html.AntiForgeryToken()
         <input type="hidden" name="ActionId" value="@Model.ActionId" />
         <input type="hidden" name="SelectedOrderIds" id="SelectedOrderIds" value="@Model.SelectedOrderIds" />
@@ -63,6 +67,7 @@
         <input type="hidden" name="AutoInsertOnBarcodeEnabled" id="AutoInsertOnBarcodeEnabled" value="@(Model.AutoInsertOnBarcodeEnabled ? "true" : "false")" />
         <input type="hidden" name="AutoFillMaxOnBarcode" id="AutoFillMaxOnBarcode" value="false" />
         <input type="hidden" name="PrefilledSelectionsJson" id="PrefilledSelectionsJson" value="@Model.PrefilledSelectionsJson" />
+        <input type="hidden" name="BarcodeValue" id="BarcodeValue" value="" />
 
         <div class="barcode-panel">
             <label for="lotBarcode" class="barcode-label">Barcode lotto</label>
@@ -80,13 +85,13 @@
         <div class="launch-grid" aria-label="Lotti disponibili">
             @foreach (var launch in Model.Launches)
             {
-                var isSelected = selectedIds.Contains(launch.OrderId.ToString());
                 var producedValue = launch.QuantityProduced ?? 0m;
                 var remainingValue = Math.Max(launch.QuantityToProduce - producedValue, 0m);
+                var isSelected = selectedIds.Contains(launch.OrderId.ToString());
                 var launchMaterialLotsJson = System.Text.Json.JsonSerializer.Serialize(launch.AvailableMaterialLots ?? new List<string>());
                 var launchMaterialLotsBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(launchMaterialLotsJson));
                 <article
-                    class="launch-card@(isSelected ? " is-selected" : string.Empty)"
+                    class="launch-card@(isSelected ? " is-selected" : string.Empty)@(launch.IsClosed ? " is-closed" : string.Empty)"
                     data-order-id="@launch.OrderId"
                     data-lot-code="@launch.LotCode"
                     data-max-qty="@launch.QuantityToProduce.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
@@ -103,6 +108,10 @@
                         ×
                     </button>
                     <span class="launch-card-code">@launch.LotCode</span>
+                    @if (launch.IsClosed)
+                    {
+                        <span class="launch-card-status">Chiuso</span>
+                    }
                     <span class="launch-card-doc-number">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? $"Doc. {launch.DocumentNumber}" : string.Empty)</span>
                     <span class="launch-card-fields">
                         <span class="launch-field">

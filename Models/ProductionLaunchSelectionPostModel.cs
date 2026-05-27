@@ -11,6 +11,7 @@ public class ProductionLaunchSelectionPostModel
     public bool AutoInsertOnBarcodeEnabled { get; init; }
     public bool AutoFillMaxOnBarcode { get; init; }
     public string PrefilledSelectionsJson { get; init; } = "[]";
+    public string BarcodeValue { get; init; } = string.Empty;
 
 
     public IReadOnlyList<ProductionLaunchPrefillSelectionItem> GetPrefilledSelections()

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Molina.Bedding.Mvc.Models;
 using Molina.Bedding.Mvc.Services;
@@ -203,8 +204,7 @@ public class ProductionDeclarationController : Controller
 
         try
         {
-            var launches = _productionLaunchService.GetOpenLaunches(actionDefinition.LineCode!, resolveMaterialLots).ToList();
-            ApplyProducedQuantities(actionDefinition, normalizedProductionMode, launches);
+            var launches = LoadLaunchesForSelection(actionDefinition, normalizedProductionMode, selectedOrderIds, resolveMaterialLots);
             var model = BuildLaunchesViewModel(
                 actionDefinition,
                 normalizedProductionMode,
@@ -234,6 +234,78 @@ public class ProductionDeclarationController : Controller
                 TempData["LaunchesSuccessMessage"] as string);
 
             return View(model);
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public IActionResult AddLaunchFromBarcode(ProductionLaunchSelectionPostModel postModel)
+    {
+        var selectedOperators = LoadSelectedOperatorsFromSession();
+        if (selectedOperators.Count == 0)
+        {
+            return RedirectToAction(nameof(Operators));
+        }
+
+        if (!TryGetWorkAction(postModel.ActionId, out var actionDefinition) || actionDefinition.FlowType != WorkFlowType.ProductionLaunches || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            return RedirectToAction(nameof(WorkMenu));
+        }
+
+        HttpContext.Session.SetString(SelectedActionIdSessionKey, actionDefinition.Id);
+
+        var normalizedProductionMode = ResolveAndPersistProductionMode(actionDefinition, postModel.ProductionMode);
+        if (IsTrapunteProductionAction(actionDefinition) && string.IsNullOrWhiteSpace(normalizedProductionMode))
+        {
+            return RedirectToAction(nameof(WorkMenu));
+        }
+
+        HttpContext.Session.SetString(AutoInsertOnBarcodeSessionKey, postModel.AutoInsertOnBarcodeEnabled ? "1" : "0");
+
+        var selectedOrderIds = postModel.GetSelectedOrderIds().ToList();
+        var resolveMaterialLots = ShouldResolveMaterialLots(actionDefinition);
+        try
+        {
+            var matchingLaunches = ResolveLaunchesFromBarcode(actionDefinition.LineCode!, postModel.BarcodeValue, resolveMaterialLots).ToList();
+            if (matchingLaunches.Count == 0)
+            {
+                TempData["LaunchesValidationMessage"] = "Barcode lotto non riconosciuto.";
+                return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
+            }
+
+            if (matchingLaunches.Count > 1)
+            {
+                TempData["LaunchesValidationMessage"] = "Ho trovato piu lotti compatibili. Controlla il barcode e riprova.";
+                return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
+            }
+
+            var launch = matchingLaunches[0];
+            if (!selectedOrderIds.Contains(launch.OrderId))
+            {
+                selectedOrderIds.Add(launch.OrderId);
+            }
+
+            selectedOrderIds = selectedOrderIds
+                .Distinct()
+                .OrderBy(static value => value)
+                .ToList();
+
+            var prefilledSelections = postModel.GetPrefilledSelections()
+                .Where(item => selectedOrderIds.Contains(item.OrderId))
+                .ToList();
+
+            HttpContext.Session.SetString(SelectedLaunchOrderIdsSessionKey, string.Join(',', selectedOrderIds));
+            HttpContext.Session.SetString(LaunchPrefillSelectionsSessionKey, SerializeLaunchPrefillSelections(prefilledSelections));
+            TempData["LaunchesSuccessMessage"] = launch.IsClosed
+                ? $"Lotto chiuso {launch.LotCode} aggiunto alla selezione."
+                : $"Lotto {launch.LotCode} aggiunto alla selezione.";
+
+            return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
+        }
+        catch (Exception ex)
+        {
+            TempData["LaunchesValidationMessage"] = $"Non riesco a cercare il lotto indicato. {ex.Message}";
+            return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
         }
     }
 
@@ -302,13 +374,12 @@ public class ProductionDeclarationController : Controller
 
         try
         {
-            var selectedLaunches = _productionLaunchService.GetOpenLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
+            var selectedLaunches = _productionLaunchService.GetLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
             ApplyProducedQuantities(actionDefinition, normalizedProductionMode, selectedLaunches);
             var blockingMaterialLotMessage = GetBlockingMaterialLotMessage(selectedLaunches, selectedOrderIds);
             if (!string.IsNullOrWhiteSpace(blockingMaterialLotMessage))
             {
-                var launches = _productionLaunchService.GetOpenLaunches(actionDefinition.LineCode!, resolveMaterialLots).ToList();
-                ApplyProducedQuantities(actionDefinition, normalizedProductionMode, launches);
+                var launches = LoadLaunchesForSelection(actionDefinition, normalizedProductionMode, selectedOrderIds, resolveMaterialLots);
                 var model = BuildLaunchesViewModel(
                     actionDefinition,
                     normalizedProductionMode,
@@ -674,7 +745,7 @@ public class ProductionDeclarationController : Controller
 
         var resolveMaterialLots = ShouldResolveMaterialLots(actionDefinition);
         var availableLaunchList = _productionLaunchService
-            .GetOpenLaunchesByOrderIds(actionDefinition.LineCode!, declaredRows.Select(static row => row.OrderId).ToList(), resolveMaterialLots)
+            .GetLaunchesByOrderIds(actionDefinition.LineCode!, declaredRows.Select(static row => row.OrderId).ToList(), resolveMaterialLots)
             .ToList();
         ApplyProducedQuantities(actionDefinition, postModel.ProductionMode, availableLaunchList);
         var availableLaunches = availableLaunchList.ToDictionary(static item => item.OrderId);
@@ -837,7 +908,7 @@ public class ProductionDeclarationController : Controller
         List<ProductionLaunchItemViewModel> selectedLaunches;
         try
         {
-            selectedLaunches = _productionLaunchService.GetOpenLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
+            selectedLaunches = _productionLaunchService.GetLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
         }
         catch (Exception ex)
         {
@@ -1005,6 +1076,153 @@ public class ProductionDeclarationController : Controller
                 ? producedQuantity
                 : 0m;
         }
+    }
+
+    private List<ProductionLaunchItemViewModel> LoadLaunchesForSelection(
+        WorkActionDefinition actionDefinition,
+        string? productionMode,
+        IReadOnlyCollection<int> selectedOrderIds,
+        bool resolveMaterialLots)
+    {
+        var launches = _productionLaunchService.GetOpenLaunches(actionDefinition.LineCode!, resolveMaterialLots).ToList();
+        if (selectedOrderIds.Count > 0)
+        {
+            var existingOrderIds = launches.Select(static launch => launch.OrderId).ToHashSet();
+            var selectedLaunches = _productionLaunchService.GetLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds.ToList(), resolveMaterialLots);
+            foreach (var selectedLaunch in selectedLaunches)
+            {
+                if (existingOrderIds.Add(selectedLaunch.OrderId))
+                {
+                    launches.Add(selectedLaunch);
+                }
+            }
+        }
+
+        var orderedLaunches = launches
+            .OrderBy(static launch => launch.LotCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static launch => launch.OrderId)
+            .ToList();
+        ApplyProducedQuantities(actionDefinition, productionMode, orderedLaunches);
+        return orderedLaunches;
+    }
+
+    private IReadOnlyList<ProductionLaunchItemViewModel> ResolveLaunchesFromBarcode(string lineCode, string rawBarcode, bool resolveMaterialLots)
+    {
+        var orderId = ExtractOrderIdFromBarcode(rawBarcode);
+        if (orderId.HasValue)
+        {
+            return _productionLaunchService.GetLaunchesByOrderIds(lineCode, [orderId.Value], resolveMaterialLots);
+        }
+
+        var lotCode = ExtractLotCodeFromBarcode(rawBarcode) ?? NormalizeBarcodeValue(rawBarcode);
+        if (string.IsNullOrWhiteSpace(lotCode))
+        {
+            return [];
+        }
+
+        return _productionLaunchService.FindLaunchesByLotCode(lineCode, lotCode, resolveMaterialLots);
+    }
+
+    private static int? ExtractOrderIdFromBarcode(string? rawValue)
+    {
+        var sourceValue = (rawValue ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(sourceValue))
+        {
+            return null;
+        }
+
+        var upperValue = sourceValue.ToUpperInvariant();
+        if (upperValue.EndsWith("//LOTTO", StringComparison.Ordinal) && !upperValue.Contains("LOTTO=", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var markerIndex = upperValue.IndexOf("//LOTTO", StringComparison.Ordinal);
+        if (markerIndex < 0)
+        {
+            return null;
+        }
+
+        var prefixValue = sourceValue[..markerIndex].Trim();
+        if (string.IsNullOrWhiteSpace(prefixValue))
+        {
+            return null;
+        }
+
+        var prefixSegments = prefixValue
+            .Split("//", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (prefixSegments.Length == 0)
+        {
+            return null;
+        }
+
+        var lastSegment = prefixSegments[^1];
+        var equalsIndex = lastSegment.LastIndexOf('=');
+        var candidateValue = equalsIndex >= 0
+            ? lastSegment[(equalsIndex + 1)..].Trim()
+            : lastSegment.Trim();
+
+        if (int.TryParse(candidateValue, out var directOrderId))
+        {
+            return directOrderId;
+        }
+
+        var digitsMatch = Regex.Match(candidateValue, @"\d+");
+        return digitsMatch.Success && int.TryParse(digitsMatch.Value, out var parsedOrderId)
+            ? parsedOrderId
+            : null;
+    }
+
+    private static string? ExtractLotCodeFromBarcode(string? rawValue)
+    {
+        var sourceValue = (rawValue ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(sourceValue))
+        {
+            return null;
+        }
+
+        var lotMatch = Regex.Match(sourceValue, @"(?:^|//)LOTTO=([^/]+)", RegexOptions.IgnoreCase);
+        if (lotMatch.Success && lotMatch.Groups[1].Success)
+        {
+            return NormalizeBarcodeValue(lotMatch.Groups[1].Value);
+        }
+
+        const string trailingMarker = "//LOTTO";
+        if (!sourceValue.ToUpperInvariant().EndsWith(trailingMarker, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var prefixValue = sourceValue[..^trailingMarker.Length].Trim();
+        if (string.IsNullOrWhiteSpace(prefixValue))
+        {
+            return null;
+        }
+
+        var prefixSegments = prefixValue
+            .Split("//", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (prefixSegments.Length == 0)
+        {
+            return null;
+        }
+
+        var lastSegment = prefixSegments[^1];
+        var equalsIndex = lastSegment.LastIndexOf('=');
+        var candidateValue = equalsIndex >= 0
+            ? lastSegment[(equalsIndex + 1)..].Trim()
+            : lastSegment.Trim();
+
+        return string.IsNullOrWhiteSpace(candidateValue)
+            ? null
+            : NormalizeBarcodeValue(candidateValue);
+    }
+
+    private static string NormalizeBarcodeValue(string? value)
+    {
+        return new string((value ?? string.Empty)
+                .Where(static character => !char.IsWhiteSpace(character))
+                .ToArray())
+            .ToUpperInvariant();
     }
 
     private static void ApplyPostedValues(Screen4ViewModel model, Screen4InsertPostModel postModel)

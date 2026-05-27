@@ -35,7 +35,8 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 qta_merce,
                 qta_dichiarata,
                 des_linea_produzione,
-                cod_art
+                cod_art,
+                ind_stato_evas
             FROM [dbo].[X_OE_VW_PROD_LANCIO]
             WHERE sig_serie_doc = 'PC'
               AND ind_stato_evas = 'I'
@@ -56,6 +57,56 @@ public class SqlProductionLaunchService : IProductionLaunchService
     }
 
     public IReadOnlyList<ProductionLaunchItemViewModel> GetOpenLaunchesByOrderIds(string lineCode, IReadOnlyList<int> orderIds, bool resolveMaterialLots = false)
+    {
+        return GetLaunchesByOrderIds(lineCode, orderIds, resolveMaterialLots, onlyOpen: true);
+    }
+
+    public IReadOnlyList<ProductionLaunchItemViewModel> GetLaunchesByOrderIds(string lineCode, IReadOnlyList<int> orderIds, bool resolveMaterialLots = false)
+    {
+        return GetLaunchesByOrderIds(lineCode, orderIds, resolveMaterialLots, onlyOpen: false);
+    }
+
+    public IReadOnlyList<ProductionLaunchItemViewModel> FindLaunchesByLotCode(string lineCode, string lotCode, bool resolveMaterialLots = false)
+    {
+        var normalizedLotCode = NormalizeBarcodeLookupValue(lotCode);
+        if (string.IsNullOrWhiteSpace(normalizedLotCode))
+        {
+            return [];
+        }
+
+        const string sql = """
+            SELECT
+                prg_ordine,
+                des_campo_libero2,
+                num_doc,
+                qta_merce,
+                qta_dichiarata,
+                des_linea_produzione,
+                cod_art,
+                ind_stato_evas
+            FROM [dbo].[X_OE_VW_PROD_LANCIO]
+            WHERE sig_serie_doc = 'PC'
+              AND cod_linea_produzione = @lineCode
+              AND UPPER(REPLACE(LTRIM(RTRIM(CONVERT(varchar(255), ISNULL(des_campo_libero2, '')))), ' ', '')) = @lotCode
+            ORDER BY des_campo_libero2, prg_ordine
+            """;
+
+        using var connection = _dbConnectionFactory.CreateConnection();
+        connection.Open();
+
+        var items = LoadLaunches(connection, sql, [
+            new SqlParameter("@lineCode", lineCode),
+            new SqlParameter("@lotCode", normalizedLotCode)
+        ]);
+        if (resolveMaterialLots)
+        {
+            ApplyMaterialLots(connection, items);
+        }
+
+        return items;
+    }
+
+    private IReadOnlyList<ProductionLaunchItemViewModel> GetLaunchesByOrderIds(string lineCode, IReadOnlyList<int> orderIds, bool resolveMaterialLots, bool onlyOpen)
     {
         var normalizedIds = orderIds
             .Distinct()
@@ -81,10 +132,11 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 qta_merce,
                 qta_dichiarata,
                 des_linea_produzione,
-                cod_art
+                cod_art,
+                ind_stato_evas
             FROM [dbo].[X_OE_VW_PROD_LANCIO]
             WHERE sig_serie_doc = 'PC'
-              AND ind_stato_evas = 'I'
+              {(onlyOpen ? "AND ind_stato_evas = 'I'" : string.Empty)}
               AND cod_linea_produzione = @lineCode
               AND prg_ordine IN ({string.Join(", ", parameterNames)})
             ORDER BY des_campo_libero2, prg_ordine
@@ -322,6 +374,14 @@ public class SqlProductionLaunchService : IProductionLaunchService
         return (value ?? string.Empty).Trim();
     }
 
+    private static string NormalizeBarcodeLookupValue(string? value)
+    {
+        return new string((value ?? string.Empty)
+                .Where(static character => !char.IsWhiteSpace(character))
+                .ToArray())
+            .ToUpperInvariant();
+    }
+
     private static string EscapeIdentifier(string identifier)
     {
         return $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
@@ -353,6 +413,10 @@ public class SqlProductionLaunchService : IProductionLaunchService
             ? string.Empty
             : Convert.ToString(reader["cod_art"])?.Trim() ?? string.Empty;
 
+        var statusCode = reader["ind_stato_evas"] == DBNull.Value
+            ? string.Empty
+            : Convert.ToString(reader["ind_stato_evas"])?.Trim() ?? string.Empty;
+
         return new ProductionLaunchItemViewModel
         {
             OrderId = Convert.ToInt32(reader["prg_ordine"]),
@@ -361,7 +425,8 @@ public class SqlProductionLaunchService : IProductionLaunchService
             QuantityToProduce = quantityToProduce,
             QuantityProduced = quantityProduced,
             LineDescription = lineDescription,
-            ArticleCode = articleCode
+            ArticleCode = articleCode,
+            StatusCode = statusCode
         };
     }
 

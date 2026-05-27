@@ -723,6 +723,7 @@
 
         const cards = Array.from(document.querySelectorAll(".launch-card"));
         const hiddenField = document.getElementById("SelectedOrderIds");
+        const barcodeValueHidden = document.getElementById("BarcodeValue");
         const prefilledSelectionsHidden = document.getElementById("PrefilledSelectionsJson");
         const barcodeInput = document.getElementById("lotBarcode");
         const continueButton = document.getElementById("launchContinueButton");
@@ -994,6 +995,20 @@
             }
 
             syncPrefilledSelectionsHidden();
+        }
+
+        function submitBarcodeLookup(rawValue) {
+            const addLaunchUrl = form.getAttribute("data-add-launch-from-barcode-url") || "";
+            if (!barcodeValueHidden || !addLaunchUrl) {
+                return false;
+            }
+
+            barcodeValueHidden.value = rawValue || "";
+            markAutoFillOnBarcode(false);
+            syncSelection();
+            form.setAttribute("action", addLaunchUrl);
+            form.submit();
+            return true;
         }
 
         function removeSelectedOrder(orderId) {
@@ -1342,6 +1357,11 @@
             }
 
             if (matchingCards.length === 0) {
+                if (submitBarcodeLookup(rawValue)) {
+                    showToast("Cerco il lotto anche tra quelli chiusi.", "info");
+                    return;
+                }
+
                 showToast("Barcode lotto non riconosciuto.", "warning");
                 focusBarcodeInput(true);
                 return;
@@ -1362,7 +1382,7 @@
 
             matchingCard.scrollIntoView({ behavior: "smooth", block: "center" });
 
-            if (isAutoInsertOnBarcodeEnabled()) {
+            if (isAutoInsertOnBarcodeEnabled() && getCardRemainingQuantity(matchingCard) > 0) {
                 if (barcodeInput) {
                     barcodeInput.value = "";
                 }

@@ -674,6 +674,22 @@ a { text-decoration: none; }
     box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16), 0 18px 36px rgba(34, 197, 94, 0.22);
 }
 
+.launch-card.is-closed {
+    border-color: #f59e0b;
+}
+
+.launch-card-status {
+    align-self: flex-start;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #9a3412;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    padding: 0.25rem 0.65rem;
+    text-transform: uppercase;
+}
+
 .launch-card-remove {
     position: absolute;
     top: 0.9rem;

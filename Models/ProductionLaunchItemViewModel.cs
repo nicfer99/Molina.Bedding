@@ -9,6 +9,8 @@ public class ProductionLaunchItemViewModel
     public decimal? QuantityProduced { get; set; }
     public string LineDescription { get; init; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
+    public string StatusCode { get; init; } = string.Empty;
+    public bool IsClosed => !string.Equals(StatusCode, "I", StringComparison.OrdinalIgnoreCase);
     public List<string> AvailableMaterialLots { get; set; } = [];
     public string? MaterialLotValidationMessage { get; set; }
 }
