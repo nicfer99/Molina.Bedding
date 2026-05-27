@@ -2136,9 +2136,8 @@
                         globalProblemClearButton.classList.remove("is-hidden");
                     }
                 } else {
-                    globalProblemSummaryTextElement.textContent = problemNotes.length
-                        + " note produzione/blocchi - "
-                        + formatTimeDisplay(Math.floor(totalMinutes / 60), totalMinutes % 60);
+                    globalProblemSummaryTextElement.textContent = "Totale: "
+                        + formatTimeDisplay(Math.floor(totalMinutes / 60), totalMinutes % 60).replace(" h ", " h e ");
                     globalProblemSummaryElement.classList.add("has-problem");
                     if (globalProblemClearButton) {
                         globalProblemClearButton.classList.add("is-hidden");
