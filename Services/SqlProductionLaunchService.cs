@@ -436,6 +436,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
             OrderId = Convert.ToInt32(reader["prg_ordine"]),
             LotCode = lotCode,
             DocumentNumber = documentNumber,
+            QuantityMerce = quantityToProduce,
             QuantityToProduce = quantityToProduce,
             QuantityEvaded = quantityEvaded,
             QuantityEvadedQpr = quantityEvadedQpr,
