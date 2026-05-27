@@ -944,11 +944,14 @@ public class ProductionDeclarationController : Controller
             {
                 historyLookup.TryGetValue(launch.OrderId, out var historyItems);
                 historyItems ??= [];
-                var quantityProduced = historyItems.Count > 0
+                var previouslyDeclaredQuantity = historyItems.Count > 0
                     ? historyItems.Sum(static item => item.DeclaredQuantity)
                     : producedQuantities.TryGetValue(launch.OrderId, out var producedQuantity)
                         ? producedQuantity
                         : 0m;
+                var quantityProduced = launch.IsClosed
+                    ? previouslyDeclaredQuantity
+                    : launch.QuantityProduced ?? 0m;
 
                 var availableMaterialLots = launch.AvailableMaterialLots.ToList();
                 return new Screen4SelectedLaunchViewModel
@@ -966,7 +969,7 @@ public class ProductionDeclarationController : Controller
                     ArticleCode = launch.ArticleCode,
                     AvailableMaterialLots = availableMaterialLots,
                     MaterialLotValidationMessage = launch.MaterialLotValidationMessage,
-                    HasPreviousDeclarations = quantityProduced > 0m && historyItems.Count > 0,
+                    HasPreviousDeclarations = previouslyDeclaredQuantity > 0m && historyItems.Count > 0,
                     PreviousDeclarations = historyItems
                 };
             })
@@ -1073,7 +1076,12 @@ public class ProductionDeclarationController : Controller
 
         foreach (var launch in launches)
         {
-            if (launch.IsClosed && launch.QuantityEvaded > 0m)
+            if (!launch.IsClosed)
+            {
+                continue;
+            }
+
+            if (launch.QuantityEvaded > 0m)
             {
                 launch.QuantityToProduce = launch.QuantityEvaded;
             }
