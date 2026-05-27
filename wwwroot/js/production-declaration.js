@@ -1783,6 +1783,9 @@
         const materialLotInput = document.getElementById("screen4MaterialLotInput");
         const materialLotHelp = document.getElementById("screen4MaterialLotHelp");
         const materialLotListElement = materialLotModal ? materialLotModal.querySelector("[data-material-lot-list='true']") : null;
+        const materialLotArticleSummaryElement = materialLotModal ? materialLotModal.querySelector("[data-material-lot-article-summary='true']") : null;
+        const materialLotArticleCodeElement = materialLotModal ? materialLotModal.querySelector("[data-material-lot-article-code='true']") : null;
+        const materialLotArticleDescriptionElement = materialLotModal ? materialLotModal.querySelector("[data-material-lot-article-description='true']") : null;
         let materialLotReferenceElements = [];
         let availableMaterialLotValues = [];
         const timingModal = document.getElementById("screen4TimingModal");
@@ -1810,6 +1813,7 @@
         const globalProblemMinutesHiddenElement = page.querySelector("[data-global-problem-minutes-hidden='true']");
         const globalProblemClearButton = page.querySelector("[data-clear-global-problem='true']");
         const noteTypeSelectElement = problemModal ? problemModal.querySelector("[data-note-type-select='true']") : null;
+        const noteTypeButtonElements = problemModal ? Array.from(problemModal.querySelectorAll("[data-note-type-button='true']")) : [];
         const noteDescriptionFieldElement = problemModal ? problemModal.querySelector("[data-note-description-field='true']") : null;
         const noteDescriptionInputElement = problemModal ? problemModal.querySelector("[data-note-description-input='true']") : null;
         const slotCards = Array.from(page.querySelectorAll("[data-screen4-slot='true']"));
@@ -1925,6 +1929,14 @@
         function getCurrentMaterialLotValue(slotCard) {
             const elements = getSlotElements(slotCard);
             return elements.materialLotHidden ? String(elements.materialLotHidden.value || "").trim() : "";
+        }
+
+        function getSlotArticleCode(slotCard) {
+            return String(slotCard ? slotCard.getAttribute("data-article-code") || "" : "").trim();
+        }
+
+        function getSlotArticleDescription(slotCard) {
+            return String(slotCard ? slotCard.getAttribute("data-article-description") || "" : "").trim();
         }
 
         function setMaterialLotValue(slotCard, materialLotCode) {
@@ -2213,6 +2225,7 @@
 
         function syncNoteDescriptionField() {
             if (!noteDescriptionFieldElement) {
+                updateNoteTypeButtons();
                 return;
             }
 
@@ -2223,6 +2236,7 @@
                     noteDescriptionInputElement.required = false;
                     noteDescriptionInputElement.value = "";
                 }
+                updateNoteTypeButtons();
                 return;
             }
 
@@ -2240,7 +2254,21 @@
                 updateGlobalProblemSummary("", problemHoursValue, problemMinutesValue);
             }
 
+            updateNoteTypeButtons();
             syncProblemConfirmState();
+        }
+
+        function updateNoteTypeButtons() {
+            if (noteTypeButtonElements.length === 0) {
+                return;
+            }
+
+            const selectedValue = noteTypeSelectElement ? String(noteTypeSelectElement.value || "") : "";
+            noteTypeButtonElements.forEach(function (button) {
+                const isSelected = !!selectedValue && String(button.getAttribute("data-note-type-id") || "") === selectedValue;
+                button.classList.toggle("is-selected", isSelected);
+                button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+            });
         }
 
         function getSelectedNoteTypeOption() {
@@ -2445,6 +2473,17 @@
             if (!selectedMaterialLotChoice) {
                 selectedMaterialLotChoice = getSingleMaterialLotValue(availableMaterialLotValues);
             }
+            const articleCode = getSlotArticleCode(slotCard) || "-";
+            const articleDescription = getSlotArticleDescription(slotCard) || "-";
+            if (materialLotArticleCodeElement) {
+                materialLotArticleCodeElement.textContent = articleCode;
+            }
+            if (materialLotArticleDescriptionElement) {
+                materialLotArticleDescriptionElement.textContent = articleDescription;
+            }
+            if (materialLotArticleSummaryElement) {
+                materialLotArticleSummaryElement.hidden = false;
+            }
             syncMaterialLotChoice();
             materialLotModal.hidden = false;
             refreshBodyModalState();
@@ -2478,6 +2517,12 @@
             }
             if (materialLotListElement) {
                 materialLotListElement.innerHTML = "";
+            }
+            if (materialLotArticleCodeElement) {
+                materialLotArticleCodeElement.textContent = "-";
+            }
+            if (materialLotArticleDescriptionElement) {
+                materialLotArticleDescriptionElement.textContent = "-";
             }
             materialLotReferenceElements = [];
             availableMaterialLotValues = [];
@@ -2693,6 +2738,7 @@
             if (noteTypeSelectElement) {
                 noteTypeSelectElement.value = "";
             }
+            updateNoteTypeButtons();
             if (problemDescriptionInput) {
                 problemDescriptionInput.value = "";
             }
@@ -2751,6 +2797,7 @@
             if (noteTypeSelectElement) {
                 noteTypeSelectElement.value = "";
             }
+            updateNoteTypeButtons();
             if (problemDescriptionInput) {
                 problemDescriptionInput.value = "";
             }
@@ -3062,6 +3109,18 @@
             });
             syncNoteDescriptionField();
         }
+
+        noteTypeButtonElements.forEach(function (button) {
+            button.addEventListener("click", function () {
+                if (!noteTypeSelectElement) {
+                    return;
+                }
+
+                noteTypeSelectElement.value = String(button.getAttribute("data-note-type-id") || "");
+                syncNoteDescriptionField();
+                syncProblemConfirmState();
+            });
+        });
 
         if (datePinModal) {
             datePinModal.querySelectorAll("[data-close-date-pin-modal='true']").forEach(function (button) {

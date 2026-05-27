@@ -206,6 +206,8 @@
                                         data-produced-qty="@producedQuantityText"
                                         data-remaining-qty="@remainingQuantityText"
                                         data-lot-code="@launch.LotCode"
+                                        data-article-code="@launch.ArticleCode"
+                                        data-article-description="@launch.ArticleDescription"
                                         data-material-lots-base64="@launchMaterialLotsBase64"
                                         data-material-lot-error="@launch.MaterialLotValidationMessage">
                                         <td data-label="Lotto"
@@ -489,6 +491,10 @@
             <div>
                 <div class="page-kicker">Lotto</div>
                 <h2 id="screen4MaterialLotModalTitle">Inserisci il lotto</h2>
+                <div class="material-lot-article-summary" data-material-lot-article-summary="true">
+                    <span data-material-lot-article-code="true">-</span>
+                    <strong data-material-lot-article-description="true">-</strong>
+                </div>
             </div>
             <button type="button" class="screen4-qty-modal__close" data-close-material-lot-modal="true" aria-label="Chiudi finestra">
                 ×
@@ -598,10 +604,11 @@
         @if (showClassicNoteTypeSelect)
         {
             <div class="screen4-problem-note-type">
-                <label class="screen4-problem-label" for="screen4ProblemNoteType">Tipo nota</label>
+                <div class="screen4-problem-label" id="screen4ProblemNoteTypeLabel">Tipo nota</div>
                 <select id="screen4ProblemNoteType"
                         class="screen4-date-input screen4-note-type-select"
-                        data-note-type-select="true">
+                        data-note-type-select="true"
+                        hidden>
                     <option value="">Seleziona tipo nota</option>
                     @foreach (var noteType in Model.AvailableNoteTypes)
                     {
@@ -612,6 +619,19 @@
                         </option>
                     }
                 </select>
+                <div class="screen4-note-type-buttons" role="group" aria-labelledby="screen4ProblemNoteTypeLabel">
+                    @foreach (var noteType in Model.AvailableNoteTypes)
+                    {
+                        var isSelected = Model.SelectedNoteTypeId == noteType.Id;
+                        <button type="button"
+                                class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
+                                data-note-type-button="true"
+                                data-note-type-id="@noteType.Id"
+                                aria-pressed="@(isSelected ? "true" : "false")">
+                            @noteType.Description
+                        </button>
+                    }
+                </div>
             </div>
         }
 

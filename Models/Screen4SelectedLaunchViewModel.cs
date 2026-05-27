@@ -15,6 +15,7 @@ public class Screen4SelectedLaunchViewModel
     public bool IsClosed => QuantityMerce == 0m && QuantityEvadedQpr > 0m;
     public string SelectedMaterialLotCode { get; set; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
+    public string ArticleDescription { get; set; } = string.Empty;
     public List<string> AvailableMaterialLots { get; set; } = [];
     public string? MaterialLotValidationMessage { get; set; }
     public bool HasPreviousDeclarations { get; set; }

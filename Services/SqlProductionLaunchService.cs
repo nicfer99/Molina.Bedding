@@ -38,6 +38,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 qta_dichiarata,
                 des_linea_produzione,
                 cod_art,
+                des_articolo,
                 ind_stato_evas
             FROM [dbo].[X_OE_VW_PROD_LANCIO]
             WHERE sig_serie_doc = 'PC'
@@ -87,6 +88,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 qta_dichiarata,
                 des_linea_produzione,
                 cod_art,
+                des_articolo,
                 ind_stato_evas
             FROM [dbo].[X_OE_VW_PROD_LANCIO]
             WHERE sig_serie_doc = 'PC'
@@ -139,6 +141,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 qta_dichiarata,
                 des_linea_produzione,
                 cod_art,
+                des_articolo,
                 ind_stato_evas
             FROM [dbo].[X_OE_VW_PROD_LANCIO]
             WHERE sig_serie_doc = 'PC'
@@ -427,6 +430,10 @@ public class SqlProductionLaunchService : IProductionLaunchService
             ? string.Empty
             : Convert.ToString(reader["cod_art"])?.Trim() ?? string.Empty;
 
+        var articleDescription = reader["des_articolo"] == DBNull.Value
+            ? string.Empty
+            : Convert.ToString(reader["des_articolo"])?.Trim() ?? string.Empty;
+
         var statusCode = reader["ind_stato_evas"] == DBNull.Value
             ? string.Empty
             : Convert.ToString(reader["ind_stato_evas"])?.Trim() ?? string.Empty;
@@ -443,6 +450,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
             QuantityProduced = quantityProduced,
             LineDescription = lineDescription,
             ArticleCode = articleCode,
+            ArticleDescription = articleDescription,
             StatusCode = statusCode
         };
     }

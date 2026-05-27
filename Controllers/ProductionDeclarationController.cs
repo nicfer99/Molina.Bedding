@@ -973,6 +973,7 @@ public class ProductionDeclarationController : Controller
                         ? ResolveSelectedOrAutoMaterialLotCode(null, availableMaterialLots)
                         : string.Empty,
                     ArticleCode = launch.ArticleCode,
+                    ArticleDescription = launch.ArticleDescription,
                     AvailableMaterialLots = availableMaterialLots,
                     MaterialLotValidationMessage = launch.MaterialLotValidationMessage,
                     HasPreviousDeclarations = previouslyDeclaredQuantity > 0m && historyItems.Count > 0,

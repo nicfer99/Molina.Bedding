@@ -12,6 +12,7 @@ public class ProductionLaunchItemViewModel
     public decimal? QuantityProduced { get; set; }
     public string LineDescription { get; init; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
+    public string ArticleDescription { get; set; } = string.Empty;
     public string StatusCode { get; init; } = string.Empty;
     public bool IsClosed => QuantityMerce == 0m && QuantityEvadedQpr > 0m;
     public List<string> AvailableMaterialLots { get; set; } = [];
