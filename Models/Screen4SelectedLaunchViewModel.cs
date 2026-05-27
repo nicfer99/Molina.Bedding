@@ -8,6 +8,8 @@ public class Screen4SelectedLaunchViewModel
     public decimal? QuantityToProduce { get; set; }
     public decimal? QuantityProduced { get; set; }
     public decimal? QuantityDeclared { get; set; }
+    public string StatusCode { get; set; } = string.Empty;
+    public bool IsClosed => !string.IsNullOrWhiteSpace(StatusCode) && !string.Equals(StatusCode, "I", StringComparison.OrdinalIgnoreCase);
     public string SelectedMaterialLotCode { get; set; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
     public List<string> AvailableMaterialLots { get; set; } = [];

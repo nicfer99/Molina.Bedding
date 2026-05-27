@@ -174,8 +174,8 @@
                                     <th>Lotto</th>
                                     <th>Numero Documento</th>
                                     <th>Fase</th>
-                                    <th>Qta da produrre</th>
-                                    <th>Qta prodotta</th>
+                                    <th>Qta riferimento</th>
+                                    <th>Qta gia dichiarata/prodotta</th>
                                     <th>Qta dichiarata</th>
                                     <th>Azioni</th>
                                 </tr>
@@ -230,10 +230,10 @@
                                         <td data-label="Fase">
                                             <div class="screen4-table-phase">&nbsp;</div>
                                         </td>
-                                        <td data-label="Qta da produrre">
+                                        <td data-label="@(launch.IsClosed ? "Qta evasa" : "Qta da produrre")">
                                             <div class="screen4-table-number" data-max-value="true">@(launch.QuantityToProduce?.ToString("0.##") ?? "-")</div>
                                         </td>
-                                        <td data-label="Qta prodotta">
+                                        <td data-label="@(launch.IsClosed ? "Gia dichiarata" : "Qta prodotta")">
                                             <div class="screen4-produced-cell">
                                                 <strong class="screen4-table-number screen4-table-number--produced-readonly">@producedQuantity.ToString("0.##")</strong>
                                             </div>

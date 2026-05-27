@@ -423,6 +423,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
             LotCode = lotCode,
             DocumentNumber = documentNumber,
             QuantityToProduce = quantityToProduce,
+            QuantityEvaded = quantityProduced,
             QuantityProduced = quantityProduced,
             LineDescription = lineDescription,
             ArticleCode = articleCode,

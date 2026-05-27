@@ -467,7 +467,7 @@ public class ProductionDeclarationController : Controller
         {
             var resolveMaterialLots = ShouldResolveMaterialLots(actionDefinition);
             var availableLaunches = _productionLaunchService
-                .GetOpenLaunchesByOrderIds(actionDefinition.LineCode!, [postModel.OrderId], resolveMaterialLots)
+                .GetLaunchesByOrderIds(actionDefinition.LineCode!, [postModel.OrderId], resolveMaterialLots)
                 .ToList();
             ApplyProducedQuantities(actionDefinition, normalizedProductionMode, availableLaunches);
             var availableLaunch = availableLaunches.FirstOrDefault();
@@ -959,6 +959,7 @@ public class ProductionDeclarationController : Controller
                     QuantityToProduce = launch.QuantityToProduce,
                     QuantityProduced = quantityProduced,
                     QuantityDeclared = null,
+                    StatusCode = launch.StatusCode,
                     SelectedMaterialLotCode = model.RequiresMaterialLotSelection
                         ? ResolveSelectedOrAutoMaterialLotCode(null, availableMaterialLots)
                         : string.Empty,
@@ -1072,6 +1073,11 @@ public class ProductionDeclarationController : Controller
 
         foreach (var launch in launches)
         {
+            if (launch.IsClosed && launch.QuantityEvaded > 0m)
+            {
+                launch.QuantityToProduce = launch.QuantityEvaded;
+            }
+
             launch.QuantityProduced = producedByOrderId.TryGetValue(launch.OrderId, out var producedQuantity)
                 ? producedQuantity
                 : 0m;
