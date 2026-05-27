@@ -33,7 +33,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 des_campo_libero2,
                 num_doc,
                 qta_merce,
-                qta_evasa,
+                qta_evasa_qpr,
                 qta_dichiarata,
                 des_linea_produzione,
                 cod_art,
@@ -81,7 +81,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 des_campo_libero2,
                 num_doc,
                 qta_merce,
-                qta_evasa,
+                qta_evasa_qpr,
                 qta_dichiarata,
                 des_linea_produzione,
                 cod_art,
@@ -132,7 +132,7 @@ public class SqlProductionLaunchService : IProductionLaunchService
                 des_campo_libero2,
                 num_doc,
                 qta_merce,
-                qta_evasa,
+                qta_evasa_qpr,
                 qta_dichiarata,
                 des_linea_produzione,
                 cod_art,
@@ -408,9 +408,9 @@ public class SqlProductionLaunchService : IProductionLaunchService
             ? 0m
             : Convert.ToDecimal(reader["qta_dichiarata"]);
 
-        var quantityEvaded = reader["qta_evasa"] == DBNull.Value
+        var quantityEvaded = reader["qta_evasa_qpr"] == DBNull.Value
             ? 0m
-            : Convert.ToDecimal(reader["qta_evasa"]);
+            : Convert.ToDecimal(reader["qta_evasa_qpr"]);
 
         var lineDescription = reader["des_linea_produzione"] == DBNull.Value
             ? string.Empty
