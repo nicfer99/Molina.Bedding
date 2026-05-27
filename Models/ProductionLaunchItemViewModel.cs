@@ -7,6 +7,7 @@ public class ProductionLaunchItemViewModel
     public string DocumentNumber { get; init; } = string.Empty;
     public decimal QuantityToProduce { get; set; }
     public decimal QuantityEvaded { get; init; }
+    public decimal QuantityEvadedQpr { get; init; }
     public decimal? QuantityProduced { get; set; }
     public string LineDescription { get; init; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
