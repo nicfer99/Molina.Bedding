@@ -960,6 +960,7 @@ public class ProductionDeclarationController : Controller
                     LotCode = launch.LotCode,
                     DocumentNumber = launch.DocumentNumber,
                     QuantityToProduce = launch.QuantityToProduce,
+                    QuantityEvaded = launch.QuantityEvaded,
                     QuantityProduced = quantityProduced,
                     QuantityDeclared = null,
                     StatusCode = launch.StatusCode,

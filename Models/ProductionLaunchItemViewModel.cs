@@ -11,7 +11,7 @@ public class ProductionLaunchItemViewModel
     public string LineDescription { get; init; } = string.Empty;
     public string ArticleCode { get; set; } = string.Empty;
     public string StatusCode { get; init; } = string.Empty;
-    public bool IsClosed => !string.IsNullOrWhiteSpace(StatusCode) && !string.Equals(StatusCode, "I", StringComparison.OrdinalIgnoreCase);
+    public bool IsClosed => QuantityEvaded > 0m;
     public List<string> AvailableMaterialLots { get; set; } = [];
     public string? MaterialLotValidationMessage { get; set; }
 }
