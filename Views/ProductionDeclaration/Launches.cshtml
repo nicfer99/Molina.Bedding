@@ -115,11 +115,11 @@
                     <span class="launch-card-doc-number">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? $"Doc. {launch.DocumentNumber}" : string.Empty)</span>
                     <span class="launch-card-fields">
                         <span class="launch-field">
-                            <span class="launch-field-label">@(launch.IsClosed ? "Qta evasa" : "Qta da produrre")</span>
+                            <span class="launch-field-label">Qta da produrre</span>
                             <span class="launch-field-value">@launch.QuantityToProduce.ToString("0.##")</span>
                         </span>
                         <span class="launch-field">
-                            <span class="launch-field-label">@(launch.IsClosed ? "Gia dichiarata" : "Qta prodotta")</span>
+                            <span class="launch-field-label">Qta prodotta</span>
                             <span class="launch-field-value@(launch.QuantityProduced.GetValueOrDefault() > 0 ? " launch-field-value--produced" : string.Empty)">@(launch.QuantityProduced?.ToString("0.##") ?? "0")</span>
                         </span>
                     </span>
