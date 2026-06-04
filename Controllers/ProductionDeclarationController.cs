@@ -372,44 +372,6 @@ public class ProductionDeclarationController : Controller
             }
         }
 
-        try
-        {
-            var selectedLaunches = _productionLaunchService.GetLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds, resolveMaterialLots).ToList();
-            ApplyProducedQuantities(actionDefinition, normalizedProductionMode, selectedLaunches);
-            var blockingMaterialLotMessage = GetBlockingMaterialLotMessage(selectedLaunches, selectedOrderIds);
-            if (!string.IsNullOrWhiteSpace(blockingMaterialLotMessage))
-            {
-                var launches = LoadLaunchesForSelection(actionDefinition, normalizedProductionMode, selectedOrderIds, resolveMaterialLots);
-                var model = BuildLaunchesViewModel(
-                    actionDefinition,
-                    normalizedProductionMode,
-                    selectedOperators,
-                    launches,
-                    selectedOrderIds,
-                    postModel.AutoInsertOnBarcodeEnabled,
-                    postModel.PrefilledSelectionsJson ?? "[]",
-                    blockingMaterialLotMessage,
-                    null);
-
-                return View("Launches", model);
-            }
-        }
-        catch
-        {
-            var model = BuildLaunchesViewModel(
-                actionDefinition,
-                normalizedProductionMode,
-                selectedOperators,
-                [],
-                selectedOrderIds,
-                postModel.AutoInsertOnBarcodeEnabled,
-                postModel.PrefilledSelectionsJson ?? "[]",
-                "Non riesco a validare i lotti materiale per i lanci selezionati.",
-                null);
-
-            return View("Launches", model);
-        }
-
         var prefilledSelections = postModel.GetPrefilledSelections()
             .Where(item => selectedOrderIds.Contains(item.OrderId))
             .Select(item =>
