@@ -440,25 +440,10 @@ public class ProductionDeclarationController : Controller
                 return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
             }
 
-            var blockingMaterialLotMessage = GetBlockingMaterialLotMessage(new[] { availableLaunch }, new[] { postModel.OrderId });
-            if (!string.IsNullOrWhiteSpace(blockingMaterialLotMessage))
-            {
-                TempData["LaunchesValidationMessage"] = blockingMaterialLotMessage;
-                return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
-            }
-
             var requiresMaterialLotSelection = RequiresMaterialLotSelection(actionDefinition, normalizedProductionMode);
             var normalizedMaterialLotCode = requiresMaterialLotSelection
                 ? ResolveAvailableMaterialLotCode(postModel.SelectedMaterialLotCode, availableLaunch.AvailableMaterialLots)
                 : string.Empty;
-            if (requiresMaterialLotSelection)
-            {
-                if (string.IsNullOrWhiteSpace(normalizedMaterialLotCode) && availableLaunch.AvailableMaterialLots.Count > 0)
-                {
-                    TempData["LaunchesValidationMessage"] = $"Ci sono lotti disponibili per il lotto {availableLaunch!.LotCode}. Conferma se vuoi salvare senza dichiarare il lotto materiale.";
-                    return RedirectToAction(nameof(Launches), new { actionId = actionDefinition.Id, productionMode = normalizedProductionMode });
-                }
-            }
 
             var quantityProduced = availableLaunch.QuantityProduced ?? 0m;
             var availableQuantity = Math.Max(availableLaunch.QuantityToProduce - quantityProduced, 0m);
@@ -703,7 +688,6 @@ public class ProductionDeclarationController : Controller
 
         var selectedMaterialLots = postModel.GetSelectedMaterialLotByOrderId();
         var confirmedOverLimitOrderIds = postModel.GetConfirmedOverLimitOrderIds();
-        var confirmedMissingMaterialLotOrderIds = postModel.GetConfirmedMissingMaterialLotOrderIds();
         var requiresMaterialLotSelection = RequiresMaterialLotSelection(actionDefinition, GetSelectedProductionMode());
 
         var resolveMaterialLots = ShouldResolveMaterialLots(actionDefinition);
@@ -724,29 +708,11 @@ public class ProductionDeclarationController : Controller
                 return View("Screen4", invalidModel);
             }
 
-            if (!string.IsNullOrWhiteSpace(launch.MaterialLotValidationMessage) && !IsMissingMaterialStockMessage(launch.MaterialLotValidationMessage))
-            {
-                var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
-                ApplyPostedValues(invalidModel, postModel);
-                invalidModel.ValidationMessage = launch.MaterialLotValidationMessage;
-                return View("Screen4", invalidModel);
-            }
-
             selectedMaterialLots.TryGetValue(declaredRow.OrderId, out var materialLotCode);
             var normalizedMaterialLotCode = requiresMaterialLotSelection
                 ? ResolveAvailableMaterialLotCode(materialLotCode, launch.AvailableMaterialLots)
                 : string.Empty;
             normalizedMaterialLotsByOrderId[declaredRow.OrderId] = normalizedMaterialLotCode;
-            if (requiresMaterialLotSelection
-                && string.IsNullOrWhiteSpace(normalizedMaterialLotCode)
-                && launch.AvailableMaterialLots.Count > 0
-                && !confirmedMissingMaterialLotOrderIds.Contains(declaredRow.OrderId))
-            {
-                var invalidModel = BuildScreen4Model(actionDefinition, selectedOperators);
-                ApplyPostedValues(invalidModel, postModel);
-                invalidModel.ValidationMessage = $"Ci sono lotti disponibili per il lotto {launch.LotCode}. Conferma se vuoi salvare senza dichiarare il lotto materiale.";
-                return View("Screen4", invalidModel);
-            }
 
             var quantityToProduce = launch.QuantityToProduce;
             var quantityProduced = launch.QuantityProduced ?? 0m;
@@ -1372,20 +1338,6 @@ public class ProductionDeclarationController : Controller
         }
 
         return NormalizeMaterialLotCode(availableMaterialLots.First());
-    }
-
-    private static string? GetBlockingMaterialLotMessage(IEnumerable<ProductionLaunchItemViewModel> launches, IReadOnlyCollection<int> selectedOrderIds)
-    {
-        return launches
-            .Where(item => selectedOrderIds.Contains(item.OrderId))
-            .Select(static item => item.MaterialLotValidationMessage)
-            .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value) && !IsMissingMaterialStockMessage(value));
-    }
-
-    private static bool IsMissingMaterialStockMessage(string? value)
-    {
-        return !string.IsNullOrWhiteSpace(value)
-            && value.Trim().StartsWith("Non ho trovato lotti disponibili", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? GetDeclarationPhaseCode(WorkActionDefinition actionDefinition, string? productionMode)

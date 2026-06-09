@@ -688,10 +688,6 @@
         return String(element ? element.getAttribute("data-material-lot-error") : "").trim();
     }
 
-    function isMissingMaterialStockMessage(value) {
-        return String(value || "").trim().toLowerCase().indexOf("non ho trovato lotti disponibili") === 0;
-    }
-
     function getSingleMaterialLotValue(values) {
         return Array.isArray(values) && values.length === 1
             ? String(values[0] || "").trim()
@@ -1118,7 +1114,7 @@
                 }
                 directMaterialLotReferenceElements = [];
                 availableDirectMaterialLotValues = [];
-                return isMissingMaterialStockMessage(materialLotError);
+                return true;
             }
 
             availableDirectMaterialLotValues = getMaterialLotValuesFromElement(card);
@@ -2626,7 +2622,7 @@
                     ? getCurrentMaterialLotValue(slotCard)
                     : "";
                 if (requiresMaterialLotSelection && !currentMaterialLotValue) {
-                    showToast("Qta dichiarata aggiornata. Seleziona ora il lotto.", "info");
+                    showToast("Qta dichiarata aggiornata. Se necessario seleziona il lotto.", "info");
                 } else {
                     showToast(successMessage || "Qta dichiarata aggiornata.", "success");
                 }
@@ -3006,7 +3002,7 @@
                     ? getCurrentMaterialLotValue(slotCard)
                     : "";
                 if (requiresMaterialLotSelection && !currentMaterialLotValue) {
-                    showToast("Qta dichiarata impostata al massimo disponibile. Seleziona ora il lotto.", "info");
+                    showToast("Qta dichiarata impostata al massimo disponibile. Se necessario seleziona il lotto.", "info");
                 } else {
                     showToast("Qta dichiarata impostata al massimo disponibile.", "success");
                 }
