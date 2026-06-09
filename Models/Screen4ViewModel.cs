@@ -30,4 +30,5 @@ public class Screen4ViewModel
     public bool CanRequestDateEdit { get; set; }
     public bool IsDeclarationDateEditable { get; set; }
     public string ConfirmedOverLimitOrderIds { get; set; } = string.Empty;
+    public string ConfirmedMissingMaterialLotOrderIds { get; set; } = string.Empty;
 }

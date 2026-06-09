@@ -688,6 +688,10 @@
         return String(element ? element.getAttribute("data-material-lot-error") : "").trim();
     }
 
+    function isMissingMaterialStockMessage(value) {
+        return String(value || "").trim().toLowerCase().indexOf("non ho trovato lotti disponibili") === 0;
+    }
+
     function getSingleMaterialLotValue(values) {
         return Array.isArray(values) && values.length === 1
             ? String(values[0] || "").trim()
@@ -1114,7 +1118,7 @@
                 }
                 directMaterialLotReferenceElements = [];
                 availableDirectMaterialLotValues = [];
-                return false;
+                return isMissingMaterialStockMessage(materialLotError);
             }
 
             availableDirectMaterialLotValues = getMaterialLotValuesFromElement(card);
@@ -1125,7 +1129,7 @@
                     directMaterialLotHelp.classList.add("is-error");
                     directMaterialLotHelp.classList.remove("is-success");
                 }
-                return false;
+                return true;
             }
 
             return true;
@@ -1139,11 +1143,17 @@
                 directMaterialLotInput.value = directMaterialLotChoice;
             }
             if (directMaterialLotHelp) {
-                directMaterialLotHelp.textContent = directMaterialLotChoice
-                    ? "Lotto selezionato correttamente."
-                    : "Seleziona il lotto toccando uno dei lotti disponibili.";
-                directMaterialLotHelp.classList.toggle("is-success", !!directMaterialLotChoice);
-                directMaterialLotHelp.classList.toggle("is-error", false);
+                if (availableDirectMaterialLotValues.length === 0 && !directMaterialLotChoice) {
+                    directMaterialLotHelp.textContent = "Non ci sono lotti materiale disponibili per questo articolo. Puoi proseguire senza lotto.";
+                    directMaterialLotHelp.classList.add("is-error");
+                    directMaterialLotHelp.classList.remove("is-success");
+                } else {
+                    directMaterialLotHelp.textContent = directMaterialLotChoice
+                        ? "Lotto selezionato correttamente."
+                        : "Seleziona il lotto toccando uno dei lotti disponibili.";
+                    directMaterialLotHelp.classList.toggle("is-success", !!directMaterialLotChoice);
+                    directMaterialLotHelp.classList.toggle("is-error", false);
+                }
             }
             directMaterialLotReferenceElements.forEach(function (element) {
                 const value = String(element.getAttribute("data-launch-direct-material-lot-reference") || "").trim();
@@ -1293,11 +1303,6 @@
                 syncDirectMaterialLotChoice();
             }
 
-            if (requiresMaterialLotSelection && !directMaterialLotChoice) {
-                showToast("Seleziona il lotto prima di confermare.", "warning");
-                return;
-            }
-
             const remainingQuantity = getCardRemainingQuantity(activeDirectInsertCard);
             const orderId = activeDirectInsertCard.getAttribute("data-order-id") || "";
             if (!orderId) {
@@ -1311,6 +1316,18 @@
                 syncSelection();
                 closeDirectInsertModal();
                 showToast("Dati salvati in Schermata 3. Premi Avanti per completare il timing in Schermata 4.", "success");
+            }
+
+            if (requiresMaterialLotSelection && !directMaterialLotChoice && availableDirectMaterialLotValues.length > 0) {
+                showCustomConfirmDialog({
+                    title: "Conferma senza lotto",
+                    message: "Ci sono lotti disponibili in giacenza. Vuoi proseguire comunque senza dichiarare il lotto materiale?",
+                    confirmText: "Prosegui senza lotto",
+                    cancelText: "Torna ai dati",
+                    icon: "!",
+                    onConfirm: finalizeDirectInsert
+                });
+                return;
             }
 
             if (parsedQuantity > remainingQuantity) {
@@ -1766,6 +1783,7 @@
         const insertForm = document.getElementById("screen4InsertForm");
         const antiForgeryTokenElement = insertForm ? insertForm.querySelector("input[name='__RequestVerificationToken']") : null;
         const confirmedOverLimitHiddenElement = page.querySelector("[data-confirmed-over-limit-hidden='true']");
+        const confirmedMissingMaterialLotHiddenElement = page.querySelector("[data-confirmed-missing-material-lot-hidden='true']");
         const declarationDateInput = page.querySelector("[data-declaration-date-input='true']");
         const declarationDateHiddenElement = page.querySelector("[data-declaration-date-hidden='true']");
         const requestDateEditButton = page.querySelector("[data-request-date-edit='true']");
@@ -1836,6 +1854,11 @@
                 .map(function (value) { return value.trim(); })
                 .filter(Boolean)
         );
+        const confirmedMissingMaterialLotOrderIds = new Set(
+            (confirmedMissingMaterialLotHiddenElement && confirmedMissingMaterialLotHiddenElement.value ? confirmedMissingMaterialLotHiddenElement.value.split(",") : [])
+                .map(function (value) { return value.trim(); })
+                .filter(Boolean)
+        );
 
         function refreshBodyModalState() {
             const hasOpenModal = [quantityModal, materialLotModal, timingModal, problemModal, datePinModal]
@@ -1854,6 +1877,19 @@
                 .sort(function (left, right) { return left - right; });
 
             confirmedOverLimitHiddenElement.value = orderedIds.join(",");
+        }
+
+        function syncConfirmedMissingMaterialLotHidden() {
+            if (!confirmedMissingMaterialLotHiddenElement) {
+                return;
+            }
+
+            const orderedIds = Array.from(confirmedMissingMaterialLotOrderIds)
+                .map(Number)
+                .filter(function (value) { return !Number.isNaN(value); })
+                .sort(function (left, right) { return left - right; });
+
+            confirmedMissingMaterialLotHiddenElement.value = orderedIds.join(",");
         }
 
         function syncDeclarationDateHidden() {
@@ -1956,6 +1992,11 @@
             if (materialLotCell) {
                 materialLotCell.classList.toggle('has-material-lot', !!safeValue);
             }
+
+            if (safeValue) {
+                confirmedMissingMaterialLotOrderIds.delete(getSlotOrderId(slotCard));
+                syncConfirmedMissingMaterialLotHidden();
+            }
         }
 
         function updateTotalDeclaredSummary() {
@@ -2030,7 +2071,9 @@
 
             if (parsedValue === null) {
                 confirmedOverLimitOrderIds.delete(getSlotOrderId(slotCard));
+                confirmedMissingMaterialLotOrderIds.delete(getSlotOrderId(slotCard));
                 syncConfirmedOverLimitHidden();
+                syncConfirmedMissingMaterialLotHidden();
             }
 
             updateSlotButtonsState(slotCard);
@@ -3078,6 +3121,18 @@
             });
         }
 
+        function askMissingMaterialLotConfirmation(onConfirm, onCancel) {
+            showCustomConfirmDialog({
+                title: "Conferma senza lotto",
+                message: "Ci sono lotti disponibili in giacenza. Vuoi salvare comunque senza dichiarare il lotto materiale?",
+                confirmText: "Salva senza lotto",
+                cancelText: "Torna ai dati",
+                icon: "!",
+                onConfirm: onConfirm,
+                onCancel: onCancel
+            });
+        }
+
         if (problemNotesListElement) {
             problemNotesListElement.addEventListener("click", function (event) {
                 const removeButton = event.target.closest("[data-remove-problem-note-index]");
@@ -3180,6 +3235,7 @@
         updateTotalDeclaredSummary();
         updateInsertButtonState();
         syncConfirmedOverLimitHidden();
+        syncConfirmedMissingMaterialLotHidden();
 
         if (quantityModal) {
             quantityModal.querySelectorAll("[data-keypad-value]").forEach(function (button) {
@@ -3420,14 +3476,30 @@
                 }
 
                 if (requiresMaterialLotSelection) {
-                    const invalidSlot = declaredSlots.find(function (slotCard) {
+                    const missingMaterialLotSlotsToConfirm = declaredSlots.filter(function (slotCard) {
                         const materialLotHidden = slotCard.querySelector("[data-material-lot-hidden='true']");
-                        return !materialLotHidden || !String(materialLotHidden.value || "").trim();
+                        const hasMaterialLot = !!materialLotHidden && !!String(materialLotHidden.value || "").trim();
+                        if (hasMaterialLot) {
+                            return false;
+                        }
+
+                        const orderId = getSlotOrderId(slotCard);
+                        return getMaterialLotValuesFromElement(slotCard).length > 0
+                            && !confirmedMissingMaterialLotOrderIds.has(orderId);
                     });
 
-                    if (invalidSlot) {
+                    if (missingMaterialLotSlotsToConfirm.length > 0) {
                         event.preventDefault();
-                        showToast("Seleziona il lotto prima di premere Inserisci.", "warning");
+                        askMissingMaterialLotConfirmation(function () {
+                            missingMaterialLotSlotsToConfirm.forEach(function (slotCard) {
+                                const orderId = getSlotOrderId(slotCard);
+                                if (orderId) {
+                                    confirmedMissingMaterialLotOrderIds.add(orderId);
+                                }
+                            });
+                            syncConfirmedMissingMaterialLotHidden();
+                            insertForm.submit();
+                        });
                         return;
                     }
                 }

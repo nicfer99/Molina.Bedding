@@ -9,6 +9,7 @@ public class Screen4InsertPostModel
     public string ProductionMode { get; set; } = string.Empty;
     public string DeclarationDate { get; set; } = string.Empty;
     public string ConfirmedOverLimitOrderIds { get; set; } = string.Empty;
+    public string ConfirmedMissingMaterialLotOrderIds { get; set; } = string.Empty;
     public int GlobalTimingHours { get; set; }
     public int GlobalTimingMinutes { get; set; }
     public int? SelectedNoteTypeId { get; set; }
@@ -71,12 +72,22 @@ public class Screen4InsertPostModel
 
     public IReadOnlySet<int> GetConfirmedOverLimitOrderIds()
     {
-        if (string.IsNullOrWhiteSpace(ConfirmedOverLimitOrderIds))
+        return ParseOrderIdSet(ConfirmedOverLimitOrderIds);
+    }
+
+    public IReadOnlySet<int> GetConfirmedMissingMaterialLotOrderIds()
+    {
+        return ParseOrderIdSet(ConfirmedMissingMaterialLotOrderIds);
+    }
+
+    private static IReadOnlySet<int> ParseOrderIdSet(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
         {
             return new HashSet<int>();
         }
 
-        return ConfirmedOverLimitOrderIds
+        return rawValue
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(static value => int.TryParse(value, out var parsedValue) ? parsedValue : (int?)null)
             .Where(static value => value.HasValue)
