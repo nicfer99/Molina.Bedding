@@ -402,14 +402,14 @@
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal">×</button>
             </div>
             <div class="screen4-time-display-panel">
-                <div class="screen4-time-display-main">@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</div>
+                <div class="screen4-time-display-main">@FormatTime(TimingHoursDraft, TimingMinutesDraft)</div>
             </div>
             <div class="screen4-time-grid">
                 <div class="screen4-time-section">
                     <div class="screen4-time-section__label">Ore</div>
                     <div class="screen4-time-hours-controls">
                         <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(-1)">−1 ora</button>
-                        <div class="screen4-time-value-box">@Model.GlobalTimingHours</div>
+                        <div class="screen4-time-value-box">@TimingHoursDraft</div>
                         <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(1)">+1 ora</button>
                     </div>
                 </div>
@@ -418,7 +418,7 @@
                     <div class="screen4-minute-options screen4-minute-options--timing">
                         @foreach (var minute in MinuteOptions)
                         {
-                            <button type="button" class="screen4-minute-option@(Model.GlobalTimingMinutes == minute ? " is-active" : string.Empty)" @onclick="() => Model.GlobalTimingMinutes = minute">@FormatMinuteOption(minute)</button>
+                            <button type="button" class="screen4-minute-option@(TimingMinutesDraft == minute ? " is-active" : string.Empty)" @onclick="() => TimingMinutesDraft = minute">@FormatMinuteOption(minute)</button>
                         }
                     </div>
                 </div>
@@ -525,6 +525,8 @@
     private bool ShowTimingModal { get; set; }
     private bool ShowProblemModal { get; set; }
     private bool ShowDatePinModal { get; set; }
+    private int TimingHoursDraft { get; set; }
+    private int TimingMinutesDraft { get; set; }
     private string DatePin { get; set; } = string.Empty;
     private string DatePinMessage { get; set; } = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
     private bool FocusDatePinAfterRender { get; set; }
@@ -924,20 +926,29 @@
 
     private void OpenTimingModal()
     {
+        if (Model is not null)
+        {
+            TimingHoursDraft = Model.GlobalTimingHours;
+            TimingMinutesDraft = Model.GlobalTimingMinutes;
+        }
+
         ShowTimingModal = true;
     }
 
     private void CloseTimingModal()
     {
+        if (Model is not null)
+        {
+            TimingHoursDraft = Model.GlobalTimingHours;
+            TimingMinutesDraft = Model.GlobalTimingMinutes;
+        }
+
         ShowTimingModal = false;
     }
 
     private void AdjustTimingHours(int delta)
     {
-        if (Model is not null)
-        {
-            Model.GlobalTimingHours = Math.Max(0, Model.GlobalTimingHours + delta);
-        }
+        TimingHoursDraft = Math.Max(0, TimingHoursDraft + delta);
     }
 
     private async Task ClearTimingAsync()
@@ -948,12 +959,20 @@
             Model.GlobalTimingMinutes = 0;
         }
 
+        TimingHoursDraft = 0;
+        TimingMinutesDraft = 0;
         CloseTimingModal();
         await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Timing annullato.", "info");
     }
 
     private async Task ConfirmTimingAsync()
     {
+        if (Model is not null)
+        {
+            Model.GlobalTimingHours = TimingHoursDraft;
+            Model.GlobalTimingMinutes = TimingMinutesDraft;
+        }
+
         CloseTimingModal();
         await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Timing aggiornato per tutti i lotti. Verrà moltiplicato per il numero di operatori in fase di inserimento.", "success");
     }
