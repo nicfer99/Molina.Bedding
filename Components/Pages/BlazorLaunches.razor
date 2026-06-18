@@ -357,6 +357,15 @@
         }
 
         await LoadModelAsync(null, null);
+        if (!string.IsNullOrWhiteSpace(ValidationMessage))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
+        }
+        else if (!string.IsNullOrWhiteSpace(SuccessMessage))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", SuccessMessage, "success");
+        }
+
         BarcodeReference = DotNetObjectReference.Create(this);
         await JsRuntime.InvokeVoidAsync(
             "molinaBlazorBarcode.activate",
@@ -473,7 +482,7 @@
         if (!result.Success)
         {
             await LoadModelAsync(result.ValidationMessage, null);
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.ValidationMessage ?? "Barcode lotto non riconosciuto.");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.ValidationMessage ?? "Barcode lotto non riconosciuto.", "warning");
             await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
             return;
         }
@@ -492,6 +501,7 @@
 
         await PersistSelectionAsync(false);
         await LoadModelAsync(null, result.SuccessMessage);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.SuccessMessage ?? "Lotto aggiunto alla selezione.", "success");
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
     }
 
@@ -553,7 +563,7 @@
         if (SelectedOrderIds.Count == 0)
         {
             ValidationMessage = "Per andare avanti devi avere almeno un lotto verde.";
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
@@ -755,7 +765,7 @@
         if (!value.HasValue || value.Value <= 0)
         {
             ValidationMessage = "Inserisci una qta dichiarata valida.";
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
@@ -777,7 +787,7 @@
         if (!parsedQuantity.HasValue || parsedQuantity.Value <= 0)
         {
             ValidationMessage = "Inserisci una qta dichiarata valida.";
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
@@ -805,7 +815,7 @@
             await PersistSelectionAsync(false);
             CloseDirectModal();
             await LoadModelAsync(null, null);
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Dati salvati in Schermata 3. Premi Avanti per completare il timing in Schermata 4.");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Dati salvati in Schermata 3. Premi Avanti per completare il timing in Schermata 4.", "success");
         }
 
         if (Model?.RequiresMaterialLotSelection == true
