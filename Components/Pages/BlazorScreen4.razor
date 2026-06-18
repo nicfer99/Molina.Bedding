@@ -144,7 +144,12 @@
                                         var note = ProblemNotes[index];
                                         <div class="screen4-problem-list-item">
                                             <span>@FormatProblemNote(note)</span>
-                                            <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNoteAsync(index)">×</button>
+                                            <button type="button"
+                                                    class="screen4-summary-clear"
+                                                    data-remove-problem-note-index="@index"
+                                                    aria-label="Rimuovi nota produzione o blocco"
+                                                    title="Rimuovi nota produzione o blocco"
+                                                    @onclick="() => RemoveProblemNoteAsync(index)">x</button>
                                         </div>
                                     }
                                 </div>
@@ -456,6 +461,7 @@
                     {
                         <button type="button"
                                 class="material-lot-reference-chip@(string.Equals(MaterialLotChoice, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
+                                data-material-lot-reference="@materialLot"
                                 aria-pressed="@(string.Equals(MaterialLotChoice, materialLot, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                                 @onclick="() => SetMaterialLotChoice(materialLot)">
                             @materialLot

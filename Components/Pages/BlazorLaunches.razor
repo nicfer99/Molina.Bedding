@@ -213,6 +213,7 @@
                                     {
                                         <button type="button"
                                                 class="material-lot-reference-chip@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
+                                                data-launch-direct-material-lot-reference="@materialLot"
                                                 aria-pressed="@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                                                 @onclick="() => SetDirectMaterialLot(materialLot)">
                                             @materialLot
