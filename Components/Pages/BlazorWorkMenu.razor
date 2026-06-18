@@ -56,7 +56,7 @@
                                         data-action-text="@action.Text"
                                         data-action-icon="@action.Icon"
                                         data-action-tone="@action.Tone"
-                                        @onclick="() => OpenActionAsync(action.Id)">
+                                        @onclick="() => OpenActionAsync(action)">
                                     <span class="dx-button-content">
                                         <span class="@GetActionIconClass(action.Icon)" aria-hidden="true"></span>
                                         <span class="dx-button-text">@action.Text</span>
@@ -125,10 +125,14 @@
         StateHasChanged();
     }
 
-    private async Task OpenActionAsync(string actionId)
+    private async Task OpenActionAsync(WorkAreaActionViewModel actionItem)
     {
-        if (!FlowService.TryGetWorkAction(actionId, out var action))
+        if (!FlowService.TryGetWorkAction(actionItem.Id, out var action))
         {
+            await JsRuntime.InvokeVoidAsync(
+                "molinaBlazorDialog.toast",
+                $"{actionItem.Text} sarà disponibile nel passaggio successivo.",
+                "info");
             return;
         }
 
