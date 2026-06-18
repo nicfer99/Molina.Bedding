@@ -198,15 +198,16 @@
                                 </div>
                             </div>
                             <div class="launch-direct-material-lot-panel">
-                                <div class="material-lot-scan-help">
-                                    Seleziona il lotto toccando uno dei lotti disponibili.
+                                <div class="@GetDirectMaterialLotHelpClass()">
+                                    @GetDirectMaterialLotHelpText()
                                 </div>
                                 <div class="material-lot-reference-list" aria-label="Lotti disponibili">
                                     @foreach (var materialLot in ActiveDirectLaunch.AvailableMaterialLots)
                                     {
                                         <button type="button"
                                                 class="material-lot-reference-chip@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
-                                                @onclick="() => DirectMaterialLotCode = materialLot">
+                                                aria-pressed="@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
+                                                @onclick="() => SetDirectMaterialLot(materialLot)">
                                             @materialLot
                                         </button>
                                     }
@@ -484,6 +485,45 @@
 
         DirectPartialQuantity = DirectQuantity;
         ShowDirectPartialModal = false;
+    }
+
+    private string GetDirectMaterialLotHelpText()
+    {
+        if (ActiveDirectLaunch is null)
+        {
+            return "Seleziona il lotto toccando uno dei lotti disponibili.";
+        }
+
+        if (ActiveDirectLaunch.AvailableMaterialLots.Count == 0 && string.IsNullOrWhiteSpace(DirectMaterialLotCode))
+        {
+            return "Non ci sono lotti materiale disponibili per questo articolo. Puoi proseguire senza lotto.";
+        }
+
+        return string.IsNullOrWhiteSpace(DirectMaterialLotCode)
+            ? "Seleziona il lotto toccando uno dei lotti disponibili."
+            : "Lotto selezionato correttamente.";
+    }
+
+    private string GetDirectMaterialLotHelpClass()
+    {
+        var cssClass = "material-lot-scan-help";
+        if (ActiveDirectLaunch is not null
+            && ActiveDirectLaunch.AvailableMaterialLots.Count == 0
+            && string.IsNullOrWhiteSpace(DirectMaterialLotCode))
+        {
+            cssClass += " is-error";
+        }
+        else if (!string.IsNullOrWhiteSpace(DirectMaterialLotCode))
+        {
+            cssClass += " is-success";
+        }
+
+        return cssClass;
+    }
+
+    private void SetDirectMaterialLot(string materialLot)
+    {
+        DirectMaterialLotCode = materialLot;
     }
 
     private void CloseDirectModal()
