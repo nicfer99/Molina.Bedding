@@ -511,7 +511,7 @@
     {
         if (SelectedOrderIds.Count == 0)
         {
-            ValidationMessage = "Seleziona almeno un lotto prima di proseguire.";
+            ValidationMessage = "Per andare avanti devi avere almeno un lotto verde.";
             await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
             return;
         }

@@ -153,30 +153,49 @@
                                     @foreach (var launch in Model.SelectedLaunches)
                                     {
                                         <tr class="screen4-table-row" data-screen4-slot="true">
-                                            <td data-label="Lotto" class="@GetLotCellClass(launch)" @onclick="() => OpenMaterialLotModalAsync(launch)">
+                                            <td data-label="Lotto"
+                                                class="@GetLotCellClass(launch)"
+                                                tabindex="@(Model.RequiresMaterialLotSelection ? "0" : null)"
+                                                role="@(Model.RequiresMaterialLotSelection ? "button" : null)"
+                                                aria-label="@(Model.RequiresMaterialLotSelection ? "Apri selezione lotto per questa riga" : null)"
+                                                @onclick="() => OpenMaterialLotModalAsync(launch)">
                                                 <div class="screen4-table-lot">@launch.LotCode</div>
                                                 @if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
                                                 {
-                                                    <button type="button" class="screen4-table-material-lot screen4-table-material-lot--editable">
+                                                    <button type="button"
+                                                            class="screen4-table-material-lot screen4-table-material-lot--editable"
+                                                            title="Modifica il lotto selezionato"
+                                                            aria-label="Modifica il lotto selezionato">
                                                         @launch.SelectedMaterialLotCode
                                                     </button>
                                                 }
                                             </td>
                                             <td data-label="Numero Documento"><div class="screen4-table-doc">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? launch.DocumentNumber : "-")</div></td>
                                             <td data-label="Fase"><div class="screen4-table-phase">&nbsp;</div></td>
-                                            <td data-label="Qta da produrre"><div class="screen4-table-number">@FormatQuantity(launch.QuantityToProduce ?? 0m)</div></td>
+                                            <td data-label="Qta da produrre"><div class="screen4-table-number">@(launch.QuantityToProduce.HasValue ? FormatQuantity(launch.QuantityToProduce.Value) : "-")</div></td>
                                             <td data-label="Qta prodotta"><strong class="screen4-table-number screen4-table-number--produced-readonly">@FormatQuantity(launch.QuantityProduced ?? 0m)</strong></td>
                                             <td data-label="Qta dichiarata"><strong class="screen4-table-number screen4-table-number--declared">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong></td>
                                             <td data-label="Azioni">
                                                 <div class="screen4-slot-actions screen4-slot-actions--table">
-                                                    <button type="button" class="screen4-slot-button screen4-slot-button--max" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => SetMaxQuantityAsync(launch)">Max</button>
+                                                    <button type="button"
+                                                            class="screen4-slot-button screen4-slot-button--max"
+                                                            title="@(GetRemainingQuantity(launch) <= 0m ? "Quantità già completata" : "Imposta la qta massima residua")"
+                                                            disabled="@(GetRemainingQuantity(launch) <= 0m)"
+                                                            @onclick="() => SetMaxQuantityAsync(launch)">Max</button>
                                                     @if (Model.RequiresMaterialLotSelection)
                                                     {
-                                                        <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => OpenMaterialLotModalAsync(launch)">Lotto</button>
+                                                        <button type="button"
+                                                                class="screen4-slot-button screen4-slot-button--history"
+                                                                title="Seleziona o modifica il lotto"
+                                                                @onclick="() => OpenMaterialLotModalAsync(launch)">Lotto</button>
                                                     }
                                                     @if ((launch.QuantityToProduce ?? 0m) != 1m)
                                                     {
-                                                        <button type="button" class="screen4-slot-button screen4-slot-button--partial" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => OpenQuantityModal(launch)">Qta Parziale</button>
+                                                        <button type="button"
+                                                                class="screen4-slot-button screen4-slot-button--partial"
+                                                                title="@(GetRemainingQuantity(launch) <= 0m ? "Quantità già completata" : "Inserisci una qta parziale residua")"
+                                                                disabled="@(GetRemainingQuantity(launch) <= 0m)"
+                                                                @onclick="() => OpenQuantityModal(launch)">Qta Parziale</button>
                                                     }
                                                     @if (launch.HasPreviousDeclarations)
                                                     {
@@ -272,7 +291,7 @@
                     <h2 id="screen4DatePinModalTitle">Inserisci il PIN</h2>
                     <p class="screen4-date-pin-modal__intro">Per sbloccare la data usa il PIN dell'operatore abilitato.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal">×</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <label class="screen4-date-pin-modal__label" for="screen4DatePinInput">PIN operatore</label>
@@ -316,7 +335,7 @@
                     <h2 id="screen4QuantityModalTitle">Inserisci la quantità dichiarata</h2>
                     <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal">×</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <div class="screen4-qty-modal__info">
@@ -363,7 +382,7 @@
                         <strong>@ActiveMaterialLotLaunch.ArticleDescription</strong>
                     </div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal">×</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <div class="@GetMaterialLotHelpClass()">@GetMaterialLotHelpText()</div>
@@ -401,7 +420,7 @@
                     <h2 id="screen4TimingModalTitle">Inserisci il timing</h2>
                     <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal">×</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-time-display-panel">
                 <div class="screen4-time-display-main">@FormatTime(TimingHoursDraft, TimingMinutesDraft)</div>
@@ -447,10 +466,10 @@
                     <h2 id="screen4ProblemModalTitle">NOTE PRODUZIONE O BLOCCHI</h2>
                     <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal">×</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal" aria-label="Chiudi finestra">×</button>
             </div>
 
-            @if (Model.AvailableNoteTypes.Count > 0)
+            @if (ShowClassicNoteTypeSelect)
             {
                 <div class="screen4-problem-note-type">
                     <div class="screen4-problem-label">Tipo nota</div>
@@ -542,10 +561,15 @@
     private HashSet<int> ExpandedHistoryOrderIds { get; } = [];
 
     private bool IsGenericDeclaration => Model is not null && FlowService.TryGetWorkAction(Model.ActionId, out var action) && FlowService.IsGenericDeclarationAction(action);
+    private bool IsClassicDeclaration => Model is not null
+        && !IsGenericDeclaration
+        && Model.ActionId.EndsWith("-dichiarazione-produzione", StringComparison.OrdinalIgnoreCase);
+    private bool ShowClassicNoteTypeSelect => IsClassicDeclaration && Model?.AvailableNoteTypes.Count > 0;
     private DeclarationNoteTypeViewModel? SelectedNoteType => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == Model.SelectedNoteTypeId);
     private bool SelectedNoteRequiresAnnotation => SelectedNoteType?.RequiresAnnotationText == true;
-    private bool RequiresProblemNoteTypeSelection => Model?.AvailableNoteTypes.Count > 0;
-    private bool ProblemSelectedNoteRequiresAnnotation => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == ProblemNoteTypeId)?.RequiresAnnotationText == true;
+    private bool RequiresProblemNoteTypeSelection => ShowClassicNoteTypeSelect;
+    private bool ProblemSelectedNoteRequiresAnnotation => ShowClassicNoteTypeSelect
+        && Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == ProblemNoteTypeId)?.RequiresAnnotationText == true;
     private bool CanConfirmProblemNote => (!RequiresProblemNoteTypeSelection || ProblemNoteTypeId > 0)
         && (ProblemHours > 0 || ProblemMinutes > 0)
         && (!ProblemSelectedNoteRequiresAnnotation || !string.IsNullOrWhiteSpace(ProblemDescription));
@@ -1187,17 +1211,24 @@
 
         if (!Model.IsTimingOnlyMode)
         {
-            var declaredRows = postModel.GetDeclaredRows();
-            if (declaredRows.Count == 0)
+            if (timingMinutes <= 0)
             {
-                ValidationMessage = "Inserisci almeno una qta dichiarata prima di premere Inserisci.";
+                ValidationMessage = "Inserisci il timing prima di premere Inserisci.";
                 await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
                 return;
             }
 
-            if (timingMinutes <= 0)
+            if (ProblemNotes.Sum(static note => note.TotalMinutes) >= timingMinutes)
             {
-                ValidationMessage = "Inserisci il timing prima di premere Inserisci.";
+                ValidationMessage = "Il timing totale deve essere maggiore della somma delle note produzione o blocchi.";
+                await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
+                return;
+            }
+
+            var declaredRows = postModel.GetDeclaredRows();
+            if (declaredRows.Count == 0)
+            {
+                ValidationMessage = "Inserisci almeno una qta dichiarata prima di premere Inserisci.";
                 await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
                 return;
             }
