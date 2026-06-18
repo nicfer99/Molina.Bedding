@@ -754,15 +754,46 @@
             return;
         }
 
+        var isOverLimit = value.Value > GetRemainingQuantity(ActiveQuantityLaunch);
+        if (isOverLimit)
+        {
+            var confirmed = await JsRuntime.InvokeAsync<bool>(
+                "molinaBlazorDialog.confirm",
+                "La qta dichiarata supera la qta residua disponibile per questo lotto. Tocca Conferma comunque solo se vuoi registrarla davvero.",
+                "Conferma qta superiore al residuo",
+                "Conferma comunque",
+                "Torna ai dati",
+                "!");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
         ActiveQuantityLaunch.QuantityDeclared = value.Value;
-        if (value.Value <= GetRemainingQuantity(ActiveQuantityLaunch))
+        if (Model?.RequiresMaterialLotSelection == true
+            && string.IsNullOrWhiteSpace(ActiveQuantityLaunch.SelectedMaterialLotCode)
+            && ActiveQuantityLaunch.AvailableMaterialLots.Count == 1)
+        {
+            ActiveQuantityLaunch.SelectedMaterialLotCode = ActiveQuantityLaunch.AvailableMaterialLots[0];
+        }
+
+        if (isOverLimit)
+        {
+            ConfirmedOverLimitOrderIds.Add(ActiveQuantityLaunch.OrderId);
+        }
+        else
         {
             ConfirmedOverLimitOrderIds.Remove(ActiveQuantityLaunch.OrderId);
         }
 
+        var hasMaterialLot = Model?.RequiresMaterialLotSelection != true || !string.IsNullOrWhiteSpace(ActiveQuantityLaunch.SelectedMaterialLotCode);
         UpdateTotalDeclared();
         CloseQuantityModal();
-        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Qta dichiarata aggiornata.", "success");
+        await JsRuntime.InvokeVoidAsync(
+            "molinaBlazorDialog.toast",
+            hasMaterialLot ? "Qta dichiarata aggiornata." : "Qta dichiarata aggiornata. Se necessario seleziona il lotto.",
+            hasMaterialLot ? "success" : "info");
     }
 
     private async Task ClearActiveQuantityAsync()
@@ -770,7 +801,9 @@
         if (ActiveQuantityLaunch is not null)
         {
             ActiveQuantityLaunch.QuantityDeclared = null;
+            ActiveQuantityLaunch.SelectedMaterialLotCode = string.Empty;
             ConfirmedOverLimitOrderIds.Remove(ActiveQuantityLaunch.OrderId);
+            ConfirmedMissingMaterialLotOrderIds.Remove(ActiveQuantityLaunch.OrderId);
             UpdateTotalDeclared();
         }
 
