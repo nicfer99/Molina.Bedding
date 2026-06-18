@@ -68,6 +68,7 @@
             return;
         }
 
+        await JsRuntime.InvokeVoidAsync("molinaBlazorModal.setOpen", false);
         await FlowState.EnsureLoadedAsync();
         SelectedIds.Clear();
         foreach (var id in FlowState.SelectedOperatorIds)

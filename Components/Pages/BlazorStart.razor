@@ -30,6 +30,7 @@
             return;
         }
 
+        await JsRuntime.InvokeVoidAsync("molinaBlazorModal.setOpen", false);
         await FlowState.EnsureLoadedAsync();
         var message = FlowState.StartSuccessMessage;
         if (!string.IsNullOrWhiteSpace(message))
@@ -53,4 +54,3 @@
         Navigation.NavigateTo("/blazor/operators");
     }
 }
-

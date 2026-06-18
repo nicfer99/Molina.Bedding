@@ -22,6 +22,12 @@
         }
     };
 
+    window.molinaBlazorModal = {
+        setOpen: function (isOpen) {
+            document.body.classList.toggle("screen4-modal-open", isOpen === true);
+        }
+    };
+
     function isEditableElement(element) {
         if (!element) {
             return false;

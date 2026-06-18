@@ -292,6 +292,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SyncModalStateAsync();
+
         if (!firstRender)
         {
             return;
@@ -488,6 +490,11 @@
         DirectPartialQuantity = string.Empty;
         DirectMaterialLotCode = string.Empty;
         ShowDirectPartialModal = false;
+    }
+
+    private ValueTask SyncModalStateAsync()
+    {
+        return JsRuntime.InvokeVoidAsync("molinaBlazorModal.setOpen", ActiveDirectLaunch is not null || ShowDirectPartialModal);
     }
 
     private void SetDirectMax()

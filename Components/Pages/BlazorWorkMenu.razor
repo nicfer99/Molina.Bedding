@@ -2,6 +2,7 @@
 @inject NavigationManager Navigation
 @inject BlazorProductionDeclarationState FlowState
 @inject IProductionDeclarationFlowService FlowService
+@inject IJSRuntime JsRuntime
 
 <section class="page-section page-section--wide page-section--workmenu-expanded">
     <header class="page-header page-header--compact page-header--workmenu">
@@ -100,6 +101,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SyncModalStateAsync();
+
         if (!firstRender)
         {
             return;
@@ -149,6 +152,8 @@
     {
         const string actionId = "trapunte-dichiarazione-produzione";
         await FlowState.SetActionAsync(actionId, productionMode);
+        ShowTrapunteModeModal = false;
+        await SyncModalStateAsync();
         Navigation.NavigateTo($"/blazor/launches/{actionId}?productionMode={productionMode}");
     }
 
@@ -165,6 +170,11 @@
     private void CloseTrapunteModeModal()
     {
         ShowTrapunteModeModal = false;
+    }
+
+    private ValueTask SyncModalStateAsync()
+    {
+        return JsRuntime.InvokeVoidAsync("molinaBlazorModal.setOpen", ShowTrapunteModeModal);
     }
 
     private static string GetActionIconClass(string? icon)

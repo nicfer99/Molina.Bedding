@@ -541,6 +541,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await SyncModalStateAsync();
+
         if (!firstRender)
         {
             if (FocusDatePinAfterRender)
@@ -575,6 +577,17 @@
         ValidationMessage = Model.ValidationMessage;
         SuccessMessage = Model.SuccessMessage;
         LoadProblemNotesFromModel();
+    }
+
+    private ValueTask SyncModalStateAsync()
+    {
+        var hasOpenModal = ShowDatePinModal
+            || ActiveQuantityLaunch is not null
+            || ActiveMaterialLotLaunch is not null
+            || ShowTimingModal
+            || ShowProblemModal;
+
+        return JsRuntime.InvokeVoidAsync("molinaBlazorModal.setOpen", hasOpenModal);
     }
 
     private void LoadProblemNotesFromModel()
