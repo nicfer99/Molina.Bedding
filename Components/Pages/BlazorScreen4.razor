@@ -272,8 +272,23 @@
             </div>
             <div class="screen4-qty-modal__content">
                 <label class="screen4-date-pin-modal__label" for="screen4DatePinInput">PIN operatore</label>
-                <input type="password" id="screen4DatePinInput" class="screen4-date-pin-modal__input" inputmode="numeric" @bind="DatePin" />
+                <input type="password"
+                       id="screen4DatePinInput"
+                       class="screen4-date-pin-modal__input"
+                       inputmode="numeric"
+                       pattern="[0-9]*"
+                       autocomplete="off"
+                       value="@DatePin"
+                       @oninput="OnDatePinInput" />
                 <div class="screen4-date-pin-modal__help">@DatePinMessage</div>
+                <div class="screen4-qty-keypad screen4-date-pin-modal__keypad" aria-label="Tastierino numerico PIN">
+                    @foreach (var key in PinKeys)
+                    {
+                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressDatePinKey(key)">
+                            @(key == "Del" ? "⌫" : key)
+                        </button>
+                    }
+                </div>
             </div>
             <div class="screen4-qty-modal__footer">
                 <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseDatePinModal">Chiudi</button>
@@ -489,6 +504,7 @@
     [Parameter] public string? ActionId { get; set; }
 
     private static readonly string[] QuantityKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "Del", ","];
+    private static readonly string[] PinKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "Del"];
     private static readonly int[] MinuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
     private Screen4ViewModel? Model { get; set; }
@@ -503,6 +519,7 @@
     private bool ShowDatePinModal { get; set; }
     private string DatePin { get; set; } = string.Empty;
     private string DatePinMessage { get; set; } = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
+    private bool FocusDatePinAfterRender { get; set; }
     private List<Screen4ProblemNotePostItemModel> ProblemNotes { get; } = [];
     private int ProblemNoteTypeId { get; set; }
     private string ProblemDescription { get; set; } = string.Empty;
@@ -521,6 +538,12 @@
     {
         if (!firstRender)
         {
+            if (FocusDatePinAfterRender)
+            {
+                FocusDatePinAfterRender = false;
+                await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "screen4DatePinInput");
+            }
+
             return;
         }
 
@@ -917,11 +940,36 @@
         DatePin = string.Empty;
         DatePinMessage = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
         ShowDatePinModal = true;
+        FocusDatePinAfterRender = true;
     }
 
     private void CloseDatePinModal()
     {
         ShowDatePinModal = false;
+        DatePin = string.Empty;
+        DatePinMessage = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
+    }
+
+    private void OnDatePinInput(ChangeEventArgs args)
+    {
+        DatePin = NormalizeDatePin(args.Value?.ToString());
+    }
+
+    private void PressDatePinKey(string key)
+    {
+        if (key == "C")
+        {
+            DatePin = string.Empty;
+            return;
+        }
+
+        if (key == "Del")
+        {
+            DatePin = DatePin.Length == 0 ? string.Empty : DatePin[..^1];
+            return;
+        }
+
+        DatePin = NormalizeDatePin(DatePin + key);
     }
 
     private async Task ConfirmDatePinAsync()
@@ -940,7 +988,13 @@
 
         await FlowState.SetDateEditAuthorizedAsync(true);
         Model.IsDeclarationDateEditable = true;
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.Message, "success");
         CloseDatePinModal();
+    }
+
+    private static string NormalizeDatePin(string? value)
+    {
+        return new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
     }
 
     private async Task InsertAsync()
@@ -1084,7 +1138,10 @@
     {
         if (Model?.BackActionName == "Launches")
         {
-            Navigation.NavigateTo($"/blazor/launches/{Model.ActionId}");
+            var productionModeQuery = string.IsNullOrWhiteSpace(Model.ProductionMode)
+                ? string.Empty
+                : $"?productionMode={Uri.EscapeDataString(Model.ProductionMode)}";
+            Navigation.NavigateTo($"/blazor/launches/{Model.ActionId}{productionModeQuery}");
             return;
         }
 

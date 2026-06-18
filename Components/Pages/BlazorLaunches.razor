@@ -312,6 +312,10 @@
         }
 
         await LoadModelAsync(null, null);
+        await JsRuntime.InvokeVoidAsync(
+            "molinaBlazorBarcode.activate",
+            "lotBarcode",
+            new[] { "#launchDirectInsertModal", "#launchDirectPartialQuantityModal" });
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
         StateHasChanged();
     }

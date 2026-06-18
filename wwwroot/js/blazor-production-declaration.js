@@ -22,6 +22,117 @@
         }
     };
 
+    function isEditableElement(element) {
+        if (!element) {
+            return false;
+        }
+
+        var tagName = String(element.tagName || "").toLowerCase();
+        return tagName === "input" || tagName === "textarea" || tagName === "select" || element.isContentEditable === true;
+    }
+
+    function isButtonLikeElement(element) {
+        if (!element) {
+            return false;
+        }
+
+        var tagName = String(element.tagName || "").toLowerCase();
+        return tagName === "button" || tagName === "a" || !!element.closest("button,a,[role='button']");
+    }
+
+    function isTypingKey(event) {
+        return !event.defaultPrevented
+            && !event.ctrlKey
+            && !event.altKey
+            && !event.metaKey
+            && typeof event.key === "string"
+            && event.key.length === 1;
+    }
+
+    function isInsideAnySelector(element, selectors) {
+        if (!element || !selectors) {
+            return false;
+        }
+
+        return selectors.some(function (selector) {
+            return !!selector && !!element.closest(selector);
+        });
+    }
+
+    window.molinaBlazorBarcode = {
+        activate: function (inputId, blockedSelectors) {
+            var state = window.__molinaBlazorBarcodeState || {};
+            state.inputId = inputId;
+            state.blockedSelectors = Array.isArray(blockedSelectors) ? blockedSelectors : [];
+
+            if (!state.bound) {
+                state.bound = true;
+                state.suppressRefocus = false;
+
+                state.focusBarcode = function (clearValue) {
+                    var input = document.getElementById(state.inputId);
+                    if (!input || typeof input.focus !== "function") {
+                        return;
+                    }
+
+                    if (clearValue) {
+                        input.value = "";
+                        input.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+
+                    window.setTimeout(function () {
+                        input.focus({ preventScroll: true });
+                    }, 0);
+                };
+
+                document.addEventListener("keydown", function (event) {
+                    var input = document.getElementById(state.inputId);
+                    if (!input || isInsideAnySelector(document.activeElement, state.blockedSelectors)) {
+                        return;
+                    }
+
+                    var activeElement = document.activeElement;
+                    if (isButtonLikeElement(activeElement) || (isEditableElement(activeElement) && activeElement !== input)) {
+                        return;
+                    }
+
+                    if (event.key === "Enter") {
+                        if (document.activeElement !== input) {
+                            event.preventDefault();
+                            state.focusBarcode(true);
+                        }
+                        return;
+                    }
+
+                    if (!isTypingKey(event)) {
+                        return;
+                    }
+
+                    if (document.activeElement !== input) {
+                        input.value = event.key;
+                        input.dispatchEvent(new Event("input", { bubbles: true }));
+                        event.preventDefault();
+                        state.focusBarcode(false);
+                    }
+                });
+
+                document.addEventListener("click", function (event) {
+                    var input = document.getElementById(state.inputId);
+                    var target = event.target;
+                    if (!input || !target || isInsideAnySelector(target, state.blockedSelectors)) {
+                        return;
+                    }
+
+                    if (target !== input && !isButtonLikeElement(target) && !isEditableElement(target)) {
+                        state.focusBarcode(false);
+                    }
+                });
+            }
+
+            window.__molinaBlazorBarcodeState = state;
+        }
+    };
+
     function ensureToast() {
         var toast = document.getElementById("globalToast");
         if (!toast) {
