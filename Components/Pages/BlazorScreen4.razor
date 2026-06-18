@@ -250,7 +250,7 @@
                                                                 data-set-partial="true"
                                                                 title="@(GetRemainingQuantity(launch) <= 0m ? "Quantità già completata" : "Inserisci una qta parziale residua")"
                                                                 disabled="@(GetRemainingQuantity(launch) <= 0m)"
-                                                                @onclick="() => OpenQuantityModal(launch)">Qta Parziale</button>
+                                                                @onclick="() => OpenQuantityModalAsync(launch)">Qta Parziale</button>
                                                     }
                                                     @if (launch.HasPreviousDeclarations)
                                                     {
@@ -631,6 +631,7 @@
     private string DatePin { get; set; } = string.Empty;
     private string DatePinMessage { get; set; } = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
     private bool FocusDatePinAfterRender { get; set; }
+    private string? PendingFocusSelector { get; set; }
     private List<Screen4ProblemNotePostItemModel> ProblemNotes { get; } = [];
     private int ProblemNoteTypeId { get; set; }
     private string ProblemDescription { get; set; } = string.Empty;
@@ -670,6 +671,13 @@
             {
                 FocusDatePinAfterRender = false;
                 await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "screen4DatePinInput");
+            }
+
+            if (!string.IsNullOrWhiteSpace(PendingFocusSelector))
+            {
+                var selector = PendingFocusSelector;
+                PendingFocusSelector = null;
+                await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusBySelector", selector);
             }
 
             return;
@@ -807,10 +815,20 @@
 
     private async Task SetMaxQuantityAsync(Screen4SelectedLaunchViewModel launch)
     {
+        if (GetRemainingQuantity(launch) <= 0m)
+        {
+            return;
+        }
+
         launch.QuantityDeclared = GetRemainingQuantity(launch);
         if (Model?.RequiresMaterialLotSelection == true && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
         {
             launch.SelectedMaterialLotCode = launch.AvailableMaterialLots[0];
+        }
+
+        if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
+        {
+            ConfirmedMissingMaterialLotOrderIds.Remove(launch.OrderId);
         }
 
         ConfirmedOverLimitOrderIds.Remove(launch.OrderId);
@@ -822,8 +840,14 @@
         await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", message, type);
     }
 
-    private void OpenQuantityModal(Screen4SelectedLaunchViewModel launch)
+    private async Task OpenQuantityModalAsync(Screen4SelectedLaunchViewModel launch)
     {
+        if (GetRemainingQuantity(launch) <= 0m)
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "La qta da produrre è già stata completata.", "warning");
+            return;
+        }
+
         ActiveQuantityLaunch = launch;
         QuantityKeypadValue = launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : string.Empty;
     }
@@ -897,6 +921,11 @@
             ActiveQuantityLaunch.SelectedMaterialLotCode = ActiveQuantityLaunch.AvailableMaterialLots[0];
         }
 
+        if (!string.IsNullOrWhiteSpace(ActiveQuantityLaunch.SelectedMaterialLotCode))
+        {
+            ConfirmedMissingMaterialLotOrderIds.Remove(ActiveQuantityLaunch.OrderId);
+        }
+
         if (isOverLimit)
         {
             ConfirmedOverLimitOrderIds.Add(ActiveQuantityLaunch.OrderId);
@@ -962,6 +991,8 @@
         {
             MaterialLotChoice = launch.AvailableMaterialLots[0];
         }
+
+        PendingFocusSelector = "#screen4MaterialLotModal .material-lot-reference-chip.is-selected, #screen4MaterialLotModal [data-material-lot-reference]";
     }
 
     private void CloseMaterialLotModal()
@@ -1420,15 +1451,16 @@
                 postModel = BuildPostModel();
             }
 
-            var missingMaterialLotLaunch = Model.RequiresMaterialLotSelection
-                ? Model.SelectedLaunches.FirstOrDefault(launch =>
+            var missingMaterialLotLaunches = Model.RequiresMaterialLotSelection
+                ? Model.SelectedLaunches.Where(launch =>
                     launch.QuantityDeclared.HasValue
                     && launch.QuantityDeclared.Value > 0
                     && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode)
                     && launch.AvailableMaterialLots.Count > 0
                     && !ConfirmedMissingMaterialLotOrderIds.Contains(launch.OrderId))
-                : null;
-            if (missingMaterialLotLaunch is not null)
+                    .ToList()
+                : [];
+            if (missingMaterialLotLaunches.Count > 0)
             {
                 var confirmed = await JsRuntime.InvokeAsync<bool>(
                     "molinaBlazorDialog.confirm",
@@ -1442,7 +1474,11 @@
                     return;
                 }
 
-                ConfirmedMissingMaterialLotOrderIds.Add(missingMaterialLotLaunch.OrderId);
+                foreach (var launch in missingMaterialLotLaunches)
+                {
+                    ConfirmedMissingMaterialLotOrderIds.Add(launch.OrderId);
+                }
+
                 postModel = BuildPostModel();
             }
         }
