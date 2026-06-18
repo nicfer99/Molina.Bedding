@@ -448,26 +448,30 @@
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal">×</button>
             </div>
 
-            <div class="screen4-problem-note-type">
-                <div class="screen4-problem-label">Tipo nota</div>
-                <div class="screen4-note-type-buttons" role="group">
-                    @foreach (var noteType in Model.AvailableNoteTypes)
-                    {
-                        var isSelected = ProblemNoteTypeId == noteType.Id;
-                        <button type="button"
-                                class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
-                                @onclick="() => ProblemNoteTypeId = noteType.Id">
-                            @noteType.Description
-                        </button>
-                    }
+            @if (Model.AvailableNoteTypes.Count > 0)
+            {
+                <div class="screen4-problem-note-type">
+                    <div class="screen4-problem-label">Tipo nota</div>
+                    <div class="screen4-note-type-buttons" role="group">
+                        @foreach (var noteType in Model.AvailableNoteTypes)
+                        {
+                            var isSelected = ProblemNoteTypeId == noteType.Id;
+                            <button type="button"
+                                    class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
+                                    aria-pressed="@(isSelected ? "true" : "false")"
+                                    @onclick="() => ProblemNoteTypeId = noteType.Id">
+                                @noteType.Description
+                            </button>
+                        }
+                    </div>
                 </div>
-            </div>
+            }
 
             @if (ProblemSelectedNoteRequiresAnnotation)
             {
                 <div class="screen4-problem-editor">
                     <label class="screen4-problem-label" for="screen4ProblemDescription">Descrizione blocco o anomalia</label>
-                    <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata" @bind="ProblemDescription"></textarea>
+                    <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata" @bind="ProblemDescription" @bind:event="oninput"></textarea>
                 </div>
             }
 
@@ -497,7 +501,7 @@
                 <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearProblemDraftAsync">Annulla</button>
                 <div class="screen4-qty-footer-actions">
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseProblemModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmProblemNoteAsync">Aggiungi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" disabled="@(!CanConfirmProblemNote)" @onclick="ConfirmProblemNoteAsync">Aggiungi</button>
                 </div>
             </div>
         </div>
@@ -536,7 +540,11 @@
     private bool IsGenericDeclaration => Model is not null && FlowService.TryGetWorkAction(Model.ActionId, out var action) && FlowService.IsGenericDeclarationAction(action);
     private DeclarationNoteTypeViewModel? SelectedNoteType => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == Model.SelectedNoteTypeId);
     private bool SelectedNoteRequiresAnnotation => SelectedNoteType?.RequiresAnnotationText == true;
+    private bool RequiresProblemNoteTypeSelection => Model?.AvailableNoteTypes.Count > 0;
     private bool ProblemSelectedNoteRequiresAnnotation => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == ProblemNoteTypeId)?.RequiresAnnotationText == true;
+    private bool CanConfirmProblemNote => (!RequiresProblemNoteTypeSelection || ProblemNoteTypeId > 0)
+        && (ProblemHours > 0 || ProblemMinutes > 0)
+        && (!ProblemSelectedNoteRequiresAnnotation || !string.IsNullOrWhiteSpace(ProblemDescription));
     private int TotalTimingMinutes => Model is null ? 0 : (Model.GlobalTimingHours * 60) + Model.GlobalTimingMinutes;
     private bool IsInsertButtonHidden => Model?.IsTimingOnlyMode == true && TotalTimingMinutes <= 0;
     private bool IsInsertButtonDisabled => Model?.IsTimingOnlyMode != true && TotalTimingMinutes <= 0;
@@ -957,7 +965,7 @@
             return;
         }
 
-        ProblemNoteTypeId = Model.SelectedNoteTypeId ?? 0;
+        ProblemNoteTypeId = 0;
         ProblemDescription = string.Empty;
         ProblemHours = 0;
         ProblemMinutes = 0;
@@ -971,7 +979,7 @@
 
     private void ClearProblemDraft()
     {
-        ProblemNoteTypeId = Model?.SelectedNoteTypeId ?? 0;
+        ProblemNoteTypeId = 0;
         ProblemDescription = string.Empty;
         ProblemHours = 0;
         ProblemMinutes = 0;
@@ -980,12 +988,13 @@
     private async Task ClearProblemDraftAsync()
     {
         ClearProblemDraft();
+        CloseProblemModal();
         await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Inserimento nota produzione o blocco annullato.", "info");
     }
 
     private async Task ConfirmProblemNoteAsync()
     {
-        if (ProblemNoteTypeId <= 0)
+        if (RequiresProblemNoteTypeSelection && ProblemNoteTypeId <= 0)
         {
             ValidationMessage = "Seleziona un tipo nota prima di confermare il blocco o l'anomalia.";
             await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
