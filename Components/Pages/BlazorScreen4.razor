@@ -1271,7 +1271,18 @@
             return;
         }
 
-        var result = FlowService.AuthorizeDeclarationDateEdit(FlowState, DatePin);
+        DeclarationDateAuthorizationResult result;
+        try
+        {
+            result = FlowService.AuthorizeDeclarationDateEdit(FlowState, DatePin);
+        }
+        catch
+        {
+            DatePinMessage = "Errore durante la verifica del PIN.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", DatePinMessage, "error");
+            return;
+        }
+
         DatePinMessage = result.Message;
         if (!result.Success)
         {
