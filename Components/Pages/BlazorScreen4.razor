@@ -152,7 +152,7 @@
                                     @foreach (var launch in Model.SelectedLaunches)
                                     {
                                         <tr class="screen4-table-row" data-screen4-slot="true">
-                                            <td data-label="Lotto" class="@GetLotCellClass(launch)" @onclick="() => OpenMaterialLotModal(launch)">
+                                            <td data-label="Lotto" class="@GetLotCellClass(launch)" @onclick="() => OpenMaterialLotModalAsync(launch)">
                                                 <div class="screen4-table-lot">@launch.LotCode</div>
                                                 @if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
                                                 {
@@ -171,7 +171,7 @@
                                                     <button type="button" class="screen4-slot-button screen4-slot-button--max" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => SetMaxQuantityAsync(launch)">Max</button>
                                                     @if (Model.RequiresMaterialLotSelection)
                                                     {
-                                                        <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => OpenMaterialLotModal(launch)">Lotto</button>
+                                                        <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => OpenMaterialLotModalAsync(launch)">Lotto</button>
                                                     }
                                                     @if ((launch.QuantityToProduce ?? 0m) != 1m)
                                                     {
@@ -364,13 +364,14 @@
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal">×</button>
             </div>
             <div class="screen4-qty-modal__content">
-                <div class="material-lot-scan-help">Seleziona il lotto toccando uno dei lotti disponibili.</div>
+                <div class="@GetMaterialLotHelpClass()">@GetMaterialLotHelpText()</div>
                 <div class="material-lot-reference-list" aria-label="Lotti disponibili">
                     @foreach (var materialLot in ActiveMaterialLotLaunch.AvailableMaterialLots)
                     {
                         <button type="button"
                                 class="material-lot-reference-chip@(string.Equals(MaterialLotChoice, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
-                                @onclick="() => MaterialLotChoice = materialLot">
+                                aria-pressed="@(string.Equals(MaterialLotChoice, materialLot, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
+                                @onclick="() => SetMaterialLotChoice(materialLot)">
                             @materialLot
                         </button>
                     }
@@ -787,15 +788,28 @@
         await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Dati della riga annullati.", "info");
     }
 
-    private void OpenMaterialLotModal(Screen4SelectedLaunchViewModel launch)
+    private async Task OpenMaterialLotModalAsync(Screen4SelectedLaunchViewModel launch)
     {
         if (Model?.RequiresMaterialLotSelection != true)
         {
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(launch.MaterialLotValidationMessage) || launch.AvailableMaterialLots.Count == 0)
+        {
+            var message = !string.IsNullOrWhiteSpace(launch.MaterialLotValidationMessage)
+                ? launch.MaterialLotValidationMessage
+                : "Non ci sono lotti materiale disponibili per questo articolo.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", message, "warning");
+            return;
+        }
+
         ActiveMaterialLotLaunch = launch;
         MaterialLotChoice = launch.SelectedMaterialLotCode;
+        if (string.IsNullOrWhiteSpace(MaterialLotChoice) && launch.AvailableMaterialLots.Count == 1)
+        {
+            MaterialLotChoice = launch.AvailableMaterialLots[0];
+        }
     }
 
     private void CloseMaterialLotModal()
@@ -807,6 +821,25 @@
     private void ClearMaterialLotChoice()
     {
         MaterialLotChoice = string.Empty;
+    }
+
+    private void SetMaterialLotChoice(string materialLot)
+    {
+        MaterialLotChoice = materialLot;
+    }
+
+    private string GetMaterialLotHelpText()
+    {
+        return string.IsNullOrWhiteSpace(MaterialLotChoice)
+            ? "Seleziona il lotto toccando uno dei lotti disponibili."
+            : "Lotto selezionato correttamente.";
+    }
+
+    private string GetMaterialLotHelpClass()
+    {
+        return string.IsNullOrWhiteSpace(MaterialLotChoice)
+            ? "material-lot-scan-help"
+            : "material-lot-scan-help is-success";
     }
 
     private async Task ConfirmMaterialLotAsync()
