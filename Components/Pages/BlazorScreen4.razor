@@ -35,6 +35,8 @@
     else
     {
         <div id="screen4InsertForm">
+            <input type="hidden" name="ActionId" value="@Model.ActionId" />
+            <input type="hidden" name="ProductionMode" value="@Model.ProductionMode" />
             <input type="hidden" name="ConfirmedOverLimitOrderIds" value="@string.Join(",", ConfirmedOverLimitOrderIds.OrderBy(id => id))" data-confirmed-over-limit-hidden="true" />
             <input type="hidden" name="ConfirmedMissingMaterialLotOrderIds" value="@string.Join(",", ConfirmedMissingMaterialLotOrderIds.OrderBy(id => id))" data-confirmed-missing-material-lot-hidden="true" />
             <input type="hidden" name="DeclarationDate" value="@Model.DeclarationDate.ToString("yyyy-MM-dd")" data-declaration-date-hidden="true" />
@@ -90,17 +92,23 @@
                                     <button type="button" class="screen4-summary-clear" data-clear-global-timing="true" aria-label="Annulla timing" title="Annulla timing" @onclick="ClearTimingAsync">×</button>
                                 }
                             </div>
-                            <input type="hidden" value="@Model.GlobalTimingHours" data-global-timing-hours-hidden="true" />
-                            <input type="hidden" value="@Model.GlobalTimingMinutes" data-global-timing-minutes-hidden="true" />
+                            <input type="hidden" name="GlobalTimingHours" value="@Model.GlobalTimingHours" data-global-timing-hours-hidden="true" />
+                            <input type="hidden" name="GlobalTimingMinutes" value="@Model.GlobalTimingMinutes" data-global-timing-minutes-hidden="true" />
                         </div>
                     </div>
+
+                    @if (IsGenericDeclaration && Model.SelectedNoteTypeId.HasValue)
+                    {
+                        <input type="hidden" name="SelectedNoteTypeId" value="@Model.SelectedNoteTypeId.Value" />
+                    }
 
                     @if (IsGenericDeclaration && SelectedNoteRequiresAnnotation)
                     {
                         <div class="screen4-detail screen4-detail--problem-global screen4-detail--note-description" data-note-description-field="true">
                             <span class="screen4-detail-label">Annotazione</span>
                             <div class="screen4-global-problem-box">
-                                <textarea class="screen4-problem-textarea"
+                                <textarea name="GlobalProblemDescription"
+                                          class="screen4-problem-textarea"
                                           data-note-description-input="true"
                                           rows="6"
                                           placeholder="Inserisci il testo annotazione"
@@ -122,10 +130,10 @@
                                         <button type="button" class="screen4-summary-clear" data-clear-global-problem="true" aria-label="Rimuovi nota produzione o blocco" title="Rimuovi nota produzione o blocco" @onclick="ClearProblemNotesAsync">×</button>
                                     }
                                 </div>
-                                <input type="hidden" value="@Model.GlobalProblemDescription" data-global-problem-description-hidden="true" />
-                                <input type="hidden" value="@Model.GlobalProblemHours" data-global-problem-hours-hidden="true" />
-                                <input type="hidden" value="@Model.GlobalProblemMinutes" data-global-problem-minutes-hidden="true" />
-                                <input type="hidden" value="@JsonSerializer.Serialize(ProblemNotes)" data-problem-notes-hidden="true" />
+                                <input type="hidden" name="GlobalProblemDescription" value="@Model.GlobalProblemDescription" data-global-problem-description-hidden="true" />
+                                <input type="hidden" name="GlobalProblemHours" value="@Model.GlobalProblemHours" data-global-problem-hours-hidden="true" />
+                                <input type="hidden" name="GlobalProblemMinutes" value="@Model.GlobalProblemMinutes" data-global-problem-minutes-hidden="true" />
+                                <input type="hidden" name="ProblemNotesJson" value="@JsonSerializer.Serialize(ProblemNotes)" data-problem-notes-hidden="true" />
                                 @if (ProblemNotes.Count > 1)
                                 {
                                     <div class="screen4-problem-list" data-problem-notes-list="true">
@@ -203,9 +211,9 @@
                                             <td data-label="Qta prodotta"><strong class="screen4-table-number screen4-table-number--produced-readonly">@FormatQuantity(launch.QuantityProduced ?? 0m)</strong></td>
                                             <td data-label="Qta dichiarata">
                                                 <strong class="screen4-table-number screen4-table-number--declared" data-declared-value="true">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong>
-                                                <input type="hidden" value="@launch.OrderId" />
-                                                <input type="hidden" value="@(launch.QuantityDeclared.HasValue ? FormatQuantityInvariant(launch.QuantityDeclared.Value) : string.Empty)" data-declared-hidden="true" />
-                                                <input type="hidden" value="@launch.SelectedMaterialLotCode" data-material-lot-hidden="true" />
+                                                <input type="hidden" name="Rows[@index].OrderId" value="@launch.OrderId" />
+                                                <input type="hidden" name="Rows[@index].QuantityDeclared" value="@(launch.QuantityDeclared.HasValue ? FormatQuantityInvariant(launch.QuantityDeclared.Value) : string.Empty)" data-declared-hidden="true" />
+                                                <input type="hidden" name="Rows[@index].SelectedMaterialLotCode" value="@launch.SelectedMaterialLotCode" data-material-lot-hidden="true" />
                                             </td>
                                             <td data-label="Azioni">
                                                 <div class="screen4-slot-actions screen4-slot-actions--table">
@@ -345,7 +353,7 @@
                        value="@DatePin"
                        @oninput="OnDatePinInput"
                        @onkeydown="HandleDatePinKeydownAsync" />
-                <div class="screen4-date-pin-modal__help">@DatePinMessage</div>
+                <div class="screen4-date-pin-modal__help" id="screen4DatePinHelp">@DatePinMessage</div>
                 <div class="screen4-qty-keypad screen4-date-pin-modal__keypad" aria-label="Tastierino numerico PIN">
                     @foreach (var key in PinKeys)
                     {

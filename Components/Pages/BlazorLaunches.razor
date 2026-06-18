@@ -45,6 +45,13 @@
     else
     {
         <div id="launchSelectionForm" data-add-launch-from-barcode-url="">
+            <input type="hidden" name="ActionId" value="@Model.ActionId" />
+            <input type="hidden" name="SelectedOrderIds" id="SelectedOrderIds" value="@GetSelectedOrderIdsValue()" />
+            <input type="hidden" name="ProductionMode" value="@Model.ProductionMode" />
+            <input type="hidden" name="AutoInsertOnBarcodeEnabled" id="AutoInsertOnBarcodeEnabled" value="@FormatBool(AutoInsertOnBarcode)" />
+            <input type="hidden" name="AutoFillMaxOnBarcode" id="AutoFillMaxOnBarcode" value="false" />
+            <input type="hidden" name="PrefilledSelectionsJson" id="PrefilledSelectionsJson" value="@SerializePrefillSelections()" />
+            <input type="hidden" name="BarcodeValue" id="BarcodeValue" value="@BarcodeValue" />
             <div class="barcode-panel">
                 <label for="lotBarcode" class="barcode-label">Barcode lotto</label>
                 <input type="text"
@@ -773,6 +780,32 @@
     private static string FormatQuantityInvariant(decimal value)
     {
         return value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private string GetSelectedOrderIdsValue()
+    {
+        return string.Join(',', SelectedOrderIds.OrderBy(static id => id));
+    }
+
+    private string SerializePrefillSelections()
+    {
+        return System.Text.Json.JsonSerializer.Serialize(PrefillSelections.Values
+            .Where(static item => item.OrderId > 0)
+            .OrderBy(static item => item.OrderId)
+            .Select(static item => new ProductionLaunchPrefillSelectionItem
+            {
+                OrderId = item.OrderId,
+                QuantityDeclared = item.QuantityDeclared ?? string.Empty,
+                SelectedMaterialLotCode = item.SelectedMaterialLotCode?.Trim() ?? string.Empty
+            }), new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
+    }
+
+    private static string FormatBool(bool value)
+    {
+        return value ? "true" : "false";
     }
 
     private static string EncodeMaterialLots(IReadOnlyCollection<string>? materialLots)

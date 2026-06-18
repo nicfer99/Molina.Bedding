@@ -29,6 +29,7 @@
     else
     {
         <div id="operatorSelectionForm">
+            <input type="hidden" id="SelectedOperatorIds" name="SelectedOperatorIds" value="@string.Join(",", SelectedIds.OrderBy(id => id))" />
             <div class="operator-grid operator-grid--large" id="operatorGrid" aria-label="Elenco operatori selezionabili">
                 @foreach (var operatorItem in Model.Operators)
                 {
