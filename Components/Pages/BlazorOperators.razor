@@ -78,6 +78,11 @@
 
         Model = FlowService.BuildOperatorsModel(SelectedIds);
         ValidationMessage = Model.ValidationMessage;
+        if (!string.IsNullOrWhiteSpace(ValidationMessage))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
+        }
+
         StateHasChanged();
     }
 
@@ -95,8 +100,8 @@
     {
         if (SelectedIds.Count == 0)
         {
-            ValidationMessage = "Seleziona almeno un operatore prima di proseguire.";
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            ValidationMessage = "Seleziona almeno un operatore, poi premi Avanti.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
