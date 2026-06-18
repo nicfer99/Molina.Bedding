@@ -35,6 +35,9 @@
     else
     {
         <div id="screen4InsertForm">
+            <input type="hidden" name="ConfirmedOverLimitOrderIds" value="@string.Join(",", ConfirmedOverLimitOrderIds.OrderBy(id => id))" data-confirmed-over-limit-hidden="true" />
+            <input type="hidden" name="ConfirmedMissingMaterialLotOrderIds" value="@string.Join(",", ConfirmedMissingMaterialLotOrderIds.OrderBy(id => id))" data-confirmed-missing-material-lot-hidden="true" />
+            <input type="hidden" name="DeclarationDate" value="@Model.DeclarationDate.ToString("yyyy-MM-dd")" data-declaration-date-hidden="true" />
             <div class="screen4-card screen4-card--table-layout">
                 <div class="screen4-summary-bar screen4-summary-bar--screen4">
                     <div class="screen4-block screen4-block--summary">
@@ -321,7 +324,7 @@
 @if (ShowDatePinModal)
 {
     <div class="screen4-qty-modal" id="screen4DatePinModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseDatePinModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-date-pin-modal="true" @onclick="CloseDatePinModal"></div>
         <div class="screen4-qty-modal__dialog screen4-date-pin-modal" role="dialog" aria-modal="true" aria-labelledby="screen4DatePinModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
@@ -329,7 +332,7 @@
                     <h2 id="screen4DatePinModalTitle">Inserisci il PIN</h2>
                     <p class="screen4-date-pin-modal__intro">Per sbloccare la data usa il PIN dell'operatore abilitato.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-date-pin-modal="true" @onclick="CloseDatePinModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <label class="screen4-date-pin-modal__label" for="screen4DatePinInput">PIN operatore</label>
@@ -346,16 +349,20 @@
                 <div class="screen4-qty-keypad screen4-date-pin-modal__keypad" aria-label="Tastierino numerico PIN">
                     @foreach (var key in PinKeys)
                     {
-                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressDatePinKeyAsync(key)">
+                        <button type="button"
+                                class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)"
+                                data-date-pin-keypad-value="@GetKeypadValue(key)"
+                                data-date-pin-keypad-action="@GetKeypadAction(key)"
+                                @onclick="() => PressDatePinKeyAsync(key)">
                             @(key == "Del" ? "⌫" : key)
                         </button>
                     }
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseDatePinModal">Chiudi</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-date-pin-modal="true" @onclick="CloseDatePinModal">Chiudi</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmDatePinAsync">Conferma PIN</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-date-pin="true" @onclick="ConfirmDatePinAsync">Conferma PIN</button>
                 </div>
             </div>
         </div>
@@ -365,41 +372,45 @@
 @if (ActiveQuantityLaunch is not null)
 {
     <div class="screen4-qty-modal" id="screen4QuantityModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseQuantityModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-qty-modal="true" @onclick="CloseQuantityModal"></div>
         <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4QuantityModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
-                    <div class="page-kicker">Quantità parziale</div>
-                    <h2 id="screen4QuantityModalTitle">Inserisci la quantità dichiarata</h2>
-                    <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
+                    <div class="page-kicker" data-qty-modal-kicker="true">Quantità parziale</div>
+                    <h2 id="screen4QuantityModalTitle" data-qty-modal-title="true">Inserisci la quantità dichiarata</h2>
+                    <p class="screen4-qty-modal__intro" data-qty-modal-intro="true">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-qty-modal="true" @onclick="CloseQuantityModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <div class="screen4-qty-modal__info">
                     <div class="screen4-qty-modal__info-box">
-                        <span class="note-label">Qta residua</span>
-                        <strong>@FormatQuantity(GetRemainingQuantity(ActiveQuantityLaunch))</strong>
+                        <span class="note-label" id="screen4QtyModalReferenceLabel">Qta residua</span>
+                        <strong id="screen4QtyModalMax">@FormatQuantity(GetRemainingQuantity(ActiveQuantityLaunch))</strong>
                     </div>
                     <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
                         <span class="note-label">Qta dichiarata</span>
-                        <strong>@(string.IsNullOrWhiteSpace(QuantityKeypadValue) ? "0" : QuantityKeypadValue)</strong>
+                        <strong id="screen4QtyModalDisplay">@(string.IsNullOrWhiteSpace(QuantityKeypadValue) ? "0" : QuantityKeypadValue)</strong>
                     </div>
                 </div>
                 <div class="screen4-qty-keypad">
                     @foreach (var key in QuantityKeys)
                     {
-                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressQuantityKey(key)">
+                        <button type="button"
+                                class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)"
+                                data-keypad-value="@GetKeypadValue(key)"
+                                data-keypad-action="@GetKeypadAction(key)"
+                                @onclick="() => PressQuantityKey(key)">
                             @(key == "Del" ? "⌫" : key)
                         </button>
                     }
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearActiveQuantityAsync">Annulla qta dichiarata</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-current-qty="true" @onclick="ClearActiveQuantityAsync">Annulla qta dichiarata</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseQuantityModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmQuantityAsync">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-qty-modal="true" @onclick="CloseQuantityModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-qty="true" @onclick="ConfirmQuantityAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -409,22 +420,23 @@
 @if (ActiveMaterialLotLaunch is not null)
 {
     <div class="screen4-qty-modal" id="screen4MaterialLotModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseMaterialLotModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-material-lot-modal="true" @onclick="CloseMaterialLotModal"></div>
         <div class="screen4-qty-modal__dialog screen4-material-lot-modal" role="dialog" aria-modal="true" aria-labelledby="screen4MaterialLotModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Lotto</div>
                     <h2 id="screen4MaterialLotModalTitle">Inserisci il lotto</h2>
-                    <div class="material-lot-article-summary">
-                        <span>@ActiveMaterialLotLaunch.ArticleCode</span>
-                        <strong>@ActiveMaterialLotLaunch.ArticleDescription</strong>
+                    <div class="material-lot-article-summary" data-material-lot-article-summary="true">
+                        <span data-material-lot-article-code="true">@ActiveMaterialLotLaunch.ArticleCode</span>
+                        <strong data-material-lot-article-description="true">@ActiveMaterialLotLaunch.ArticleDescription</strong>
                     </div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-material-lot-modal="true" @onclick="CloseMaterialLotModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-qty-modal__content">
-                <div class="@GetMaterialLotHelpClass()">@GetMaterialLotHelpText()</div>
-                <div class="material-lot-reference-list" aria-label="Lotti disponibili">
+                <input type="hidden" id="screen4MaterialLotInput" value="@MaterialLotChoice" />
+                <div class="@GetMaterialLotHelpClass()" id="screen4MaterialLotHelp">@GetMaterialLotHelpText()</div>
+                <div class="material-lot-reference-list" data-material-lot-list="true" aria-label="Lotti disponibili">
                     @foreach (var materialLot in ActiveMaterialLotLaunch.AvailableMaterialLots)
                     {
                         <button type="button"
@@ -437,10 +449,10 @@
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearMaterialLotChoice">Annulla lotto</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-material-lot="true" @onclick="ClearMaterialLotChoice">Annulla lotto</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseMaterialLotModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmMaterialLotAsync">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-material-lot-modal="true" @onclick="CloseMaterialLotModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-material-lot="true" @onclick="ConfirmMaterialLotAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -450,26 +462,26 @@
 @if (ShowTimingModal && Model is not null)
 {
     <div class="screen4-time-modal" id="screen4TimingModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseTimingModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-timing-modal="true" @onclick="CloseTimingModal"></div>
         <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4TimingModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Timing totale</div>
                     <h2 id="screen4TimingModalTitle">Inserisci il timing</h2>
-                    <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
+                    <div class="screen4-modal-lot" id="screen4TimingModalLot">Valido per tutti i lotti selezionati</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-timing-modal="true" @onclick="CloseTimingModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="screen4-time-display-panel">
-                <div class="screen4-time-display-main">@FormatTime(TimingHoursDraft, TimingMinutesDraft)</div>
+                <div class="screen4-time-display-main" id="screen4TimingModalDisplay">@FormatTime(TimingHoursDraft, TimingMinutesDraft)</div>
             </div>
             <div class="screen4-time-grid">
                 <div class="screen4-time-section">
                     <div class="screen4-time-section__label">Ore</div>
                     <div class="screen4-time-hours-controls">
-                        <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(-1)">−1 ora</button>
-                        <div class="screen4-time-value-box">@TimingHoursDraft</div>
-                        <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(1)">+1 ora</button>
+                        <button type="button" class="screen4-time-adjust" data-timing-hours-adjust="-1" @onclick="() => AdjustTimingHours(-1)">−1 ora</button>
+                        <div class="screen4-time-value-box" id="screen4TimingHoursValue">@TimingHoursDraft</div>
+                        <button type="button" class="screen4-time-adjust" data-timing-hours-adjust="1" @onclick="() => AdjustTimingHours(1)">+1 ora</button>
                     </div>
                 </div>
                 <div class="screen4-time-section">
@@ -477,16 +489,19 @@
                     <div class="screen4-minute-options screen4-minute-options--timing">
                         @foreach (var minute in MinuteOptions)
                         {
-                            <button type="button" class="screen4-minute-option@(TimingMinutesDraft == minute ? " is-active" : string.Empty)" @onclick="() => TimingMinutesDraft = minute">@FormatMinuteOption(minute)</button>
+                            <button type="button"
+                                    class="screen4-minute-option@(TimingMinutesDraft == minute ? " is-active" : string.Empty)"
+                                    data-timing-minute-value="@minute"
+                                    @onclick="() => TimingMinutesDraft = minute">@FormatMinuteOption(minute)</button>
                         }
                     </div>
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearTimingAsync">Annulla timing</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-timing="true" @onclick="ClearTimingAsync">Annulla timing</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseTimingModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmTimingAsync">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-timing-modal="true" @onclick="CloseTimingModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-timing="true" @onclick="ConfirmTimingAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -496,27 +511,45 @@
 @if (ShowProblemModal && Model is not null)
 {
     <div class="screen4-time-modal" id="screen4ProblemModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseProblemModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-problem-modal="true" @onclick="CloseProblemModal"></div>
         <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4ProblemModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Note produzione o blocchi</div>
                     <h2 id="screen4ProblemModalTitle">NOTE PRODUZIONE O BLOCCHI</h2>
-                    <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
+                    <div class="screen4-modal-lot" id="screen4ProblemModalLot">Valido per tutti i lotti selezionati</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-problem-modal="true" @onclick="CloseProblemModal" aria-label="Chiudi finestra">×</button>
             </div>
 
             @if (ShowClassicNoteTypeSelect)
             {
                 <div class="screen4-problem-note-type">
-                    <div class="screen4-problem-label">Tipo nota</div>
-                    <div class="screen4-note-type-buttons" role="group">
+                    <div class="screen4-problem-label" id="screen4ProblemNoteTypeLabel">Tipo nota</div>
+                    <select id="screen4ProblemNoteType"
+                            class="screen4-date-input screen4-note-type-select"
+                            data-note-type-select="true"
+                            value="@ProblemNoteTypeId"
+                            hidden>
+                        <option value="">Seleziona tipo nota</option>
+                        @foreach (var noteType in Model.AvailableNoteTypes)
+                        {
+                            <option value="@noteType.Id"
+                                    data-requires-annotation="@FormatBool(noteType.RequiresAnnotationText)"
+                                    selected="@(ProblemNoteTypeId == noteType.Id ? "selected" : null)">
+                                @noteType.Description
+                            </option>
+                        }
+                    </select>
+                    <div class="screen4-note-type-buttons" role="group" aria-labelledby="screen4ProblemNoteTypeLabel">
                         @foreach (var noteType in Model.AvailableNoteTypes)
                         {
                             var isSelected = ProblemNoteTypeId == noteType.Id;
                             <button type="button"
                                     class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
+                                    data-note-type-button="true"
+                                    data-note-type-id="@noteType.Id"
+                                    data-requires-annotation="@FormatBool(noteType.RequiresAnnotationText)"
                                     aria-pressed="@(isSelected ? "true" : "false")"
                                     @onclick="() => ProblemNoteTypeId = noteType.Id">
                                 @noteType.Description
@@ -526,24 +559,21 @@
                 </div>
             }
 
-            @if (ProblemSelectedNoteRequiresAnnotation)
-            {
-                <div class="screen4-problem-editor">
-                    <label class="screen4-problem-label" for="screen4ProblemDescription">Descrizione blocco o anomalia</label>
-                    <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata" @bind="ProblemDescription" @bind:event="oninput"></textarea>
-                </div>
-            }
+            <div class="screen4-problem-editor" data-note-description-field="true" hidden="@(!ProblemSelectedNoteRequiresAnnotation)">
+                <label class="screen4-problem-label" for="screen4ProblemDescription">Descrizione blocco o anomalia</label>
+                <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" data-note-description-input="true" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata" @bind="ProblemDescription" @bind:event="oninput"></textarea>
+            </div>
 
             <div class="screen4-time-display-panel screen4-time-display-panel--problem">
-                <div class="screen4-time-display-main">@FormatTime(ProblemHours, ProblemMinutes)</div>
+                <div class="screen4-time-display-main" id="screen4ProblemModalDisplay">@FormatTime(ProblemHours, ProblemMinutes)</div>
             </div>
             <div class="screen4-time-grid">
                 <div class="screen4-time-section">
                     <div class="screen4-time-section__label">Ore</div>
                     <div class="screen4-time-hours-controls">
-                        <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours = Math.Max(0, ProblemHours - 1)">−1 ora</button>
-                        <div class="screen4-time-value-box">@ProblemHours</div>
-                        <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours++">+1 ora</button>
+                        <button type="button" class="screen4-time-adjust" data-problem-hours-adjust="-1" @onclick="() => ProblemHours = Math.Max(0, ProblemHours - 1)">−1 ora</button>
+                        <div class="screen4-time-value-box" id="screen4ProblemHoursValue">@ProblemHours</div>
+                        <button type="button" class="screen4-time-adjust" data-problem-hours-adjust="1" @onclick="() => ProblemHours++">+1 ora</button>
                     </div>
                 </div>
                 <div class="screen4-time-section">
@@ -551,16 +581,19 @@
                     <div class="screen4-minute-options screen4-minute-options--problem">
                         @foreach (var minute in MinuteOptions)
                         {
-                            <button type="button" class="screen4-minute-option@(ProblemMinutes == minute ? " is-active" : string.Empty)" @onclick="() => ProblemMinutes = minute">@FormatMinuteOption(minute)</button>
+                            <button type="button"
+                                    class="screen4-minute-option@(ProblemMinutes == minute ? " is-active" : string.Empty)"
+                                    data-problem-minute-value="@minute"
+                                    @onclick="() => ProblemMinutes = minute">@FormatMinuteOption(minute)</button>
                         }
                     </div>
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearProblemDraftAsync">Annulla</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-problem="true" @onclick="ClearProblemDraftAsync">Annulla</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseProblemModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" disabled="@(!CanConfirmProblemNote)" @onclick="ConfirmProblemNoteAsync">Aggiungi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-problem-modal="true" @onclick="CloseProblemModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-problem="true" disabled="@(!CanConfirmProblemNote)" @onclick="ConfirmProblemNoteAsync">Aggiungi</button>
                 </div>
             </div>
         </div>
@@ -1398,6 +1431,26 @@
     private static string FormatTime(int hours, int minutes)
     {
         return $"{Math.Max(0, hours):00} h {Math.Max(0, minutes):00} m";
+    }
+
+    private static string? GetKeypadValue(string key)
+    {
+        return key is "C" or "Del" ? null : key;
+    }
+
+    private static string? GetKeypadAction(string key)
+    {
+        return key switch
+        {
+            "C" => "clear",
+            "Del" => "backspace",
+            _ => null
+        };
+    }
+
+    private static string FormatBool(bool value)
+    {
+        return value ? "true" : "false";
     }
 
     private static string FormatMinuteOption(int minutes)
