@@ -13,6 +13,7 @@ public interface IProductionDeclarationFlowService
     OperatorSelectionViewModel BuildOperatorsModel(IEnumerable<int> selectedIds);
     WorkMenuViewModel BuildWorkMenuModel(IEnumerable<int> selectedIds);
     ProductionLaunchSelectionViewModel BuildLaunchesModel(BlazorProductionDeclarationState state, string actionId, string? productionMode, string? validationMessage, string? successMessage);
+    IReadOnlyList<ProductionLaunchItemViewModel> ResolveLoadedLaunchesFromBarcode(IEnumerable<ProductionLaunchItemViewModel> launches, string barcodeValue);
     BarcodeLaunchResult AddLaunchFromBarcode(BlazorProductionDeclarationState state, string actionId, string? productionMode, string barcodeValue, IEnumerable<int> selectedOrderIds, IEnumerable<ProductionLaunchPrefillSelectionItem> prefillSelections);
     Screen4ViewModel BuildScreen4Model(BlazorProductionDeclarationState state, string? actionId, string? validationMessage = null, string? successMessage = null);
     DeclarationDateAuthorizationResult AuthorizeDeclarationDateEdit(BlazorProductionDeclarationState state, string? pin);

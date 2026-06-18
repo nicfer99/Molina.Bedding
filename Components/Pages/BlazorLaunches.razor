@@ -410,12 +410,26 @@
 
     private async Task AddBarcodeAsync()
     {
-        var result = FlowService.AddLaunchFromBarcode(FlowState, ActionId, ProductionMode, BarcodeValue, SelectedOrderIds, PrefillSelections.Values);
+        var rawBarcode = BarcodeValue;
+        if (string.IsNullOrWhiteSpace(rawBarcode))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+            return;
+        }
+
+        if (await TryHandleLoadedBarcodeAsync(rawBarcode))
+        {
+            return;
+        }
+
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Cerco il lotto anche tra quelli chiusi.", "info");
+        var result = FlowService.AddLaunchFromBarcode(FlowState, ActionId, ProductionMode, rawBarcode, SelectedOrderIds, PrefillSelections.Values);
         BarcodeValue = string.Empty;
         if (!result.Success)
         {
             await LoadModelAsync(result.ValidationMessage, null);
             await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.ValidationMessage ?? "Barcode lotto non riconosciuto.");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
             return;
         }
 
@@ -433,17 +447,52 @@
 
         await PersistSelectionAsync(false);
         await LoadModelAsync(null, result.SuccessMessage);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+    }
 
-        if (AutoInsertOnBarcode && result.OrderId.HasValue)
+    private async Task<bool> TryHandleLoadedBarcodeAsync(string rawBarcode)
+    {
+        if (Model is null)
         {
-            var launch = Model?.Launches.FirstOrDefault(item => item.OrderId == result.OrderId.Value);
-            if (launch is not null && GetRemainingQuantity(launch) > 0)
-            {
-                OpenDirectModal(launch);
-            }
+            return false;
         }
 
+        var matchingLaunches = FlowService.ResolveLoadedLaunchesFromBarcode(Model.Launches, rawBarcode);
+        if (matchingLaunches.Count == 0)
+        {
+            return false;
+        }
+
+        BarcodeValue = string.Empty;
+        if (matchingLaunches.Count > 1)
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Ho trovato pi\u00f9 lotti compatibili. Controlla il barcode e riprova.", "warning");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+            return true;
+        }
+
+        var launch = matchingLaunches[0];
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.scrollLaunchCardIntoView", launch.OrderId);
+
+        if (AutoInsertOnBarcode && GetRemainingQuantity(launch) > 0)
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Lotto acquisito. Imposta qta e lotto, poi completa il timing in Schermata 4.", "success");
+            OpenDirectModal(launch);
+            return true;
+        }
+
+        if (SelectedOrderIds.Contains(launch.OrderId))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Questo lotto \u00e8 gi\u00e0 selezionato.", "info");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+            return true;
+        }
+
+        SelectedOrderIds.Add(launch.OrderId);
+        await PersistSelectionAsync(false);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Lotto aggiunto alla selezione.", "success");
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+        return true;
     }
 
     private async Task ContinueAsync()
@@ -486,6 +535,11 @@
             return "Seleziona il lotto toccando uno dei lotti disponibili.";
         }
 
+        if (!string.IsNullOrWhiteSpace(ActiveDirectLaunch.MaterialLotValidationMessage))
+        {
+            return ActiveDirectLaunch.MaterialLotValidationMessage;
+        }
+
         if (ActiveDirectLaunch.AvailableMaterialLots.Count == 0 && string.IsNullOrWhiteSpace(DirectMaterialLotCode))
         {
             return "Non ci sono lotti materiale disponibili per questo articolo. Puoi proseguire senza lotto.";
@@ -500,6 +554,11 @@
     {
         var cssClass = "material-lot-scan-help";
         if (ActiveDirectLaunch is not null
+            && !string.IsNullOrWhiteSpace(ActiveDirectLaunch.MaterialLotValidationMessage))
+        {
+            cssClass += " is-error";
+        }
+        else if (ActiveDirectLaunch is not null
             && ActiveDirectLaunch.AvailableMaterialLots.Count == 0
             && string.IsNullOrWhiteSpace(DirectMaterialLotCode))
         {
@@ -701,4 +760,5 @@
             ? value
             : null;
     }
+
 }

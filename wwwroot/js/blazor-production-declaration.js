@@ -30,6 +30,12 @@
                     element.select();
                 }
             }, 30);
+        },
+        scrollLaunchCardIntoView: function (orderId) {
+            var element = document.querySelector("[data-order-id='" + String(orderId || "") + "']");
+            if (element && typeof element.scrollIntoView === "function") {
+                element.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
         }
     };
 

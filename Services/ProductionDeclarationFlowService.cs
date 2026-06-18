@@ -251,6 +251,36 @@ public sealed class ProductionDeclarationFlowService : IProductionDeclarationFlo
         }
     }
 
+    public IReadOnlyList<ProductionLaunchItemViewModel> ResolveLoadedLaunchesFromBarcode(IEnumerable<ProductionLaunchItemViewModel> launches, string barcodeValue)
+    {
+        var availableLaunches = launches.ToList();
+        if (availableLaunches.Count == 0)
+        {
+            return [];
+        }
+
+        var normalizedValue = NormalizeBarcodeValue(barcodeValue);
+        if (string.IsNullOrWhiteSpace(normalizedValue))
+        {
+            return [];
+        }
+
+        var orderId = ExtractOrderIdFromBarcode(barcodeValue);
+        if (orderId.HasValue)
+        {
+            return availableLaunches
+                .Where(launch => launch.OrderId == orderId.Value)
+                .ToList();
+        }
+
+        var lotCode = ExtractLotCodeFromBarcode(barcodeValue) ?? normalizedValue;
+        return string.IsNullOrWhiteSpace(lotCode)
+            ? []
+            : availableLaunches
+                .Where(launch => string.Equals(NormalizeBarcodeValue(launch.LotCode), lotCode, StringComparison.Ordinal))
+                .ToList();
+    }
+
     public Screen4ViewModel BuildScreen4Model(BlazorProductionDeclarationState state, string? actionId, string? validationMessage = null, string? successMessage = null)
     {
         var selectedOperators = LoadSelectedOperators(state.SelectedOperatorIds);
