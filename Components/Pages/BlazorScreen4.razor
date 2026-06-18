@@ -208,9 +208,15 @@
                                             <td data-label="Numero Documento"><div class="screen4-table-doc">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? launch.DocumentNumber : "-")</div></td>
                                             <td data-label="Fase"><div class="screen4-table-phase">&nbsp;</div></td>
                                             <td data-label="Qta da produrre"><div class="screen4-table-number" data-max-value="true">@(launch.QuantityToProduce.HasValue ? FormatQuantity(launch.QuantityToProduce.Value) : "-")</div></td>
-                                            <td data-label="Qta prodotta"><strong class="screen4-table-number screen4-table-number--produced-readonly">@FormatQuantity(launch.QuantityProduced ?? 0m)</strong></td>
+                                            <td data-label="Qta prodotta">
+                                                <div class="screen4-produced-cell">
+                                                    <strong class="screen4-table-number screen4-table-number--produced-readonly">@FormatQuantity(launch.QuantityProduced ?? 0m)</strong>
+                                                </div>
+                                            </td>
                                             <td data-label="Qta dichiarata">
-                                                <strong class="screen4-table-number screen4-table-number--declared" data-declared-value="true">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong>
+                                                <div class="screen4-produced-cell">
+                                                    <strong class="screen4-table-number screen4-table-number--declared" data-declared-value="true">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong>
+                                                </div>
                                                 <input type="hidden" name="Rows[@index].OrderId" value="@launch.OrderId" />
                                                 <input type="hidden" name="Rows[@index].QuantityDeclared" value="@(launch.QuantityDeclared.HasValue ? FormatQuantityInvariant(launch.QuantityDeclared.Value) : string.Empty)" data-declared-hidden="true" />
                                                 <input type="hidden" name="Rows[@index].SelectedMaterialLotCode" value="@launch.SelectedMaterialLotCode" data-material-lot-hidden="true" />
