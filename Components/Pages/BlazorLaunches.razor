@@ -139,15 +139,15 @@
 @if (ActiveDirectLaunch is not null)
 {
     <div class="screen4-qty-modal" id="launchDirectInsertModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseDirectModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-launch-direct-modal="true" @onclick="CloseDirectModal"></div>
         <div class="screen4-qty-modal__dialog launch-direct-modal" role="dialog" aria-modal="true" aria-labelledby="launchDirectInsertModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Schermata 3</div>
                     <h2 id="launchDirectInsertModalTitle">Dati da riportare in Schermata 4</h2>
-                    <div class="screen4-modal-lot">@ActiveDirectLaunch.LotCode</div>
+                    <div class="screen4-modal-lot" data-launch-direct-lot="true">@ActiveDirectLaunch.LotCode</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-launch-direct-modal="true" @onclick="CloseDirectModal" aria-label="Chiudi finestra">×</button>
             </div>
 
             <div class="screen4-qty-modal__content launch-direct-modal__content">
@@ -164,17 +164,17 @@
                         <div class="screen4-qty-modal__info">
                             <div class="screen4-qty-modal__info-box">
                                 <span class="note-label">Qta residua</span>
-                                <strong>@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
+                                <strong data-launch-direct-max="true">@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
                             </div>
                             <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
                                 <span class="note-label">Qta impostata</span>
-                                <strong>@(string.IsNullOrWhiteSpace(DirectQuantity) ? "0" : DirectQuantity)</strong>
+                                <strong data-launch-direct-qty-display="true">@(string.IsNullOrWhiteSpace(DirectQuantity) ? "0" : DirectQuantity)</strong>
                             </div>
                         </div>
 
                         <div class="launch-direct-qty-actions" aria-label="Scelta quantità">
-                            <button type="button" class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action" @onclick="SetDirectMax">Max</button>
-                            <button type="button" class="screen4-slot-button screen4-slot-button--partial launch-direct-qty-action" @onclick="OpenDirectPartialModal">
+                            <button type="button" class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action" data-launch-direct-set-max="true" @onclick="SetDirectMax">Max</button>
+                            <button type="button" class="screen4-slot-button screen4-slot-button--partial launch-direct-qty-action" data-launch-direct-open-partial="true" @onclick="OpenDirectPartialModal">
                                 Qta Parziale
                             </button>
                         </div>
@@ -186,19 +186,21 @@
                             <div class="launch-direct-panel__header launch-direct-panel__header--stacked">
                                 <div>
                                     <div class="page-kicker">Lotto</div>
-                                    <strong class="launch-direct-panel__title">@(string.IsNullOrWhiteSpace(DirectMaterialLotCode) ? "Nessun lotto selezionato" : DirectMaterialLotCode)</strong>
+                                    <strong class="launch-direct-panel__title" data-launch-direct-material-lot-display="true">@(string.IsNullOrWhiteSpace(DirectMaterialLotCode) ? "Nessun lotto selezionato" : DirectMaterialLotCode)</strong>
                                     <p class="screen4-qty-modal__intro launch-direct-panel__intro">Puoi selezionare il lotto materiale, oppure proseguire senza lotto.</p>
                                 </div>
                             </div>
                             <div class="launch-direct-material-lot-panel">
-                                <div class="@GetDirectMaterialLotHelpClass()">
+                                <input type="hidden" id="launchDirectMaterialLotInput" value="@DirectMaterialLotCode" />
+                                <div class="@GetDirectMaterialLotHelpClass()" data-launch-direct-material-lot-help="true">
                                     @GetDirectMaterialLotHelpText()
                                 </div>
-                                <div class="material-lot-reference-list" aria-label="Lotti disponibili">
+                                <div class="material-lot-reference-list" data-launch-direct-material-lot-list="true" aria-label="Lotti disponibili">
                                     @foreach (var materialLot in ActiveDirectLaunch.AvailableMaterialLots)
                                     {
                                         <button type="button"
                                                 class="material-lot-reference-chip@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
+                                                data-launch-direct-material-lot-reference="@materialLot"
                                                 aria-pressed="@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                                                 @onclick="() => SetDirectMaterialLot(materialLot)">
                                             @materialLot
@@ -212,9 +214,9 @@
             </div>
 
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="CloseDirectModal">Chiudi</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-close-launch-direct-modal="true" @onclick="CloseDirectModal">Chiudi</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmDirectInsertAsync">Conferma dati</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-launch-direct-insert="true" @onclick="ConfirmDirectInsertAsync">Conferma dati</button>
                 </div>
             </div>
         </div>
@@ -224,7 +226,7 @@
 @if (ShowDirectPartialModal && ActiveDirectLaunch is not null)
 {
     <div class="screen4-qty-modal" id="launchDirectPartialQuantityModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseDirectPartialModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-launch-direct-partial-modal="true" @onclick="CloseDirectPartialModal"></div>
         <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="launchDirectPartialQuantityModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
@@ -232,25 +234,29 @@
                     <h2 id="launchDirectPartialQuantityModalTitle">Inserisci la quantità dichiarata</h2>
                     <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata per il lotto selezionato. Se supera il residuo disponibile, ti verrà chiesta una conferma dedicata.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectPartialModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-launch-direct-partial-modal="true" @onclick="CloseDirectPartialModal" aria-label="Chiudi finestra">×</button>
             </div>
 
             <div class="screen4-qty-modal__content">
                 <div class="screen4-qty-modal__info">
                     <div class="screen4-qty-modal__info-box">
-                        <span class="note-label">Qta residua</span>
-                        <strong>@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
+                        <span class="note-label" id="launchDirectPartialQtyModalReferenceLabel">Qta residua</span>
+                        <strong id="launchDirectPartialQtyModalMax">@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
                     </div>
                     <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
                         <span class="note-label">Qta dichiarata</span>
-                        <strong>@(string.IsNullOrWhiteSpace(DirectPartialQuantity) ? "0" : DirectPartialQuantity)</strong>
+                        <strong id="launchDirectPartialQtyModalDisplay">@(string.IsNullOrWhiteSpace(DirectPartialQuantity) ? "0" : DirectPartialQuantity)</strong>
                     </div>
                 </div>
 
                 <div class="screen4-qty-keypad">
                     @foreach (var key in QuantityKeys)
                     {
-                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressDirectPartialKey(key)">
+                        <button type="button"
+                                class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)"
+                                data-launch-direct-partial-keypad-value="@GetDirectPartialKeypadValue(key)"
+                                data-launch-direct-partial-keypad-action="@GetDirectPartialKeypadAction(key)"
+                                @onclick="() => PressDirectPartialKey(key)">
                             @(key == "Del" ? "⌫" : key)
                         </button>
                     }
@@ -258,10 +264,10 @@
             </div>
 
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearDirectPartialQuantity">Annulla qta dichiarata</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" data-clear-launch-direct-partial="true" @onclick="ClearDirectPartialQuantity">Annulla qta dichiarata</button>
                 <div class="screen4-qty-footer-actions">
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseDirectPartialModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmDirectPartialQuantityAsync">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" data-close-launch-direct-partial-modal="true" @onclick="CloseDirectPartialModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" data-confirm-launch-direct-partial="true" @onclick="ConfirmDirectPartialQuantityAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -754,6 +760,21 @@
     private static string FormatQuantity(decimal value)
     {
         return value.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
+    }
+
+    private static string? GetDirectPartialKeypadValue(string key)
+    {
+        return key is "C" or "Del" ? null : key;
+    }
+
+    private static string? GetDirectPartialKeypadAction(string key)
+    {
+        return key switch
+        {
+            "C" => "clear",
+            "Del" => "backspace",
+            _ => null
+        };
     }
 
     private static decimal? ParseQuantity(string? rawValue)
