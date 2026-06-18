@@ -494,7 +494,7 @@ public sealed class ProductionDeclarationFlowService : IProductionDeclarationFlo
 
         if (actionDefinition.FlowType != WorkFlowType.ProductionLaunches || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
         {
-            return Invalid(postModel, state, "L'inserimento e disponibile solo per la schermata con i lotti selezionati.");
+            return Invalid(postModel, state, "L'inserimento è disponibile solo per la schermata con i lotti selezionati.");
         }
 
         var declaredRows = postModel.GetDeclaredRows();
@@ -548,7 +548,7 @@ public sealed class ProductionDeclarationFlowService : IProductionDeclarationFlo
         {
             if (!availableLaunches.TryGetValue(declaredRow.OrderId, out var launch))
             {
-                return Invalid(postModel, state, "Non riesco a validare uno o piu lotti selezionati.");
+                return Invalid(postModel, state, "Non riesco a validare uno o più lotti selezionati.");
             }
 
             selectedMaterialLots.TryGetValue(declaredRow.OrderId, out var materialLotCode);
