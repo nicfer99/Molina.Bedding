@@ -80,6 +80,7 @@
                     var launchMaterialLotsBase64 = EncodeMaterialLots(launch.AvailableMaterialLots);
                     var isSelected = SelectedOrderIds.Contains(launch.OrderId);
                     var prefill = GetPrefill(launch.OrderId);
+                    var hasPrefill = isSelected && !string.IsNullOrWhiteSpace(prefill?.QuantityDeclared);
                     <article class="@GetLaunchCardClass(launch)"
                              data-order-id="@launch.OrderId"
                              data-lot-code="@launch.LotCode"
@@ -114,30 +115,26 @@
                                 <span class="launch-field-value@(launch.QuantityProduced.GetValueOrDefault() > 0 ? " launch-field-value--produced" : string.Empty)">@FormatQuantity(launch.QuantityProduced ?? 0m)</span>
                             </span>
                         </span>
-                        @if (isSelected)
-                        {
-                            var hasPrefill = !string.IsNullOrWhiteSpace(prefill?.QuantityDeclared);
-                            <div class="launch-card-direct-summary@(hasPrefill ? string.Empty : " is-hidden")" data-launch-prefill-summary="true">
-                                <div class="launch-card-direct-summary__row">
-                                    <span class="note-label">Qta impostata</span>
-                                    <strong data-launch-prefill-qty="true">@(hasPrefill ? prefill?.QuantityDeclared : "-")</strong>
-                                </div>
-                                @if (Model.RequiresMaterialLotSelection)
-                                {
-                                    <div class="launch-card-direct-summary__row">
-                                        <span class="note-label">Lotto</span>
-                                        <button type="button"
-                                                class="launch-card-direct-summary__lot-button"
-                                                data-open-launch-direct-modal="true"
-                                                aria-label="Modifica il lotto selezionato in Schermata 3"
-                                                @onclick:stopPropagation="true"
-                                                @onclick="() => OpenDirectModal(launch)">
-                                            <span data-launch-prefill-lot="true">@(hasPrefill && !string.IsNullOrWhiteSpace(prefill?.SelectedMaterialLotCode) ? prefill.SelectedMaterialLotCode : "Nessun lotto selezionato")</span>
-                                        </button>
-                                    </div>
-                                }
+                        <div class="launch-card-direct-summary@(hasPrefill ? string.Empty : " is-hidden")" data-launch-prefill-summary="true">
+                            <div class="launch-card-direct-summary__row">
+                                <span class="note-label">Qta impostata</span>
+                                <strong data-launch-prefill-qty="true">@(hasPrefill ? prefill?.QuantityDeclared : "-")</strong>
                             </div>
-                        }
+                            @if (Model.RequiresMaterialLotSelection)
+                            {
+                                <div class="launch-card-direct-summary__row">
+                                    <span class="note-label">Lotto</span>
+                                    <button type="button"
+                                            class="launch-card-direct-summary__lot-button"
+                                            data-open-launch-direct-modal="true"
+                                            aria-label="Modifica il lotto selezionato in Schermata 3"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => OpenDirectModal(launch)">
+                                        <span data-launch-prefill-lot="true">@(hasPrefill && !string.IsNullOrWhiteSpace(prefill?.SelectedMaterialLotCode) ? prefill.SelectedMaterialLotCode : "Nessun lotto selezionato")</span>
+                                    </button>
+                                </div>
+                            }
+                        </div>
                     </article>
                 }
             </div>

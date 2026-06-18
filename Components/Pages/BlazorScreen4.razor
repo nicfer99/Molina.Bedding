@@ -87,10 +87,12 @@
                             <button type="button" class="screen4-inline-button screen4-inline-button--stacked" data-open-global-timing="true" @onclick="OpenTimingModal">Timing</button>
                             <div class="screen4-time-display screen4-time-display--global" data-global-timing-display="true">
                                 <span data-global-timing-text="true">@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</span>
-                                @if (Model.GlobalTimingHours > 0 || Model.GlobalTimingMinutes > 0)
-                                {
-                                    <button type="button" class="screen4-summary-clear" data-clear-global-timing="true" aria-label="Annulla timing" title="Annulla timing" @onclick="ClearTimingAsync">×</button>
-                                }
+                                <button type="button"
+                                        class="screen4-summary-clear@((Model.GlobalTimingHours > 0 || Model.GlobalTimingMinutes > 0) ? string.Empty : " is-hidden")"
+                                        data-clear-global-timing="true"
+                                        aria-label="Annulla timing"
+                                        title="Annulla timing"
+                                        @onclick="ClearTimingAsync">×</button>
                             </div>
                             <input type="hidden" name="GlobalTimingHours" value="@Model.GlobalTimingHours" data-global-timing-hours-hidden="true" />
                             <input type="hidden" name="GlobalTimingMinutes" value="@Model.GlobalTimingMinutes" data-global-timing-minutes-hidden="true" />
@@ -125,28 +127,27 @@
                                 <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" data-open-global-problem="true" @onclick="OpenProblemModal">Inserisci nota Produzione o blocco</button>
                                 <div class="screen4-problem-summary screen4-problem-summary--global@(ProblemNotes.Count > 0 ? " has-problem" : string.Empty)" data-global-problem-summary="true">
                                     <span data-global-problem-summary-text="true">@GetProblemSummary()</span>
-                                    @if (ProblemNotes.Count > 0)
-                                    {
-                                        <button type="button" class="screen4-summary-clear" data-clear-global-problem="true" aria-label="Rimuovi nota produzione o blocco" title="Rimuovi nota produzione o blocco" @onclick="ClearProblemNotesAsync">×</button>
-                                    }
+                                    <button type="button"
+                                            class="screen4-summary-clear@(ProblemNotes.Count > 0 ? string.Empty : " is-hidden")"
+                                            data-clear-global-problem="true"
+                                            aria-label="Rimuovi nota produzione o blocco"
+                                            title="Rimuovi nota produzione o blocco"
+                                            @onclick="ClearProblemNotesAsync">×</button>
                                 </div>
                                 <input type="hidden" name="GlobalProblemDescription" value="@Model.GlobalProblemDescription" data-global-problem-description-hidden="true" />
                                 <input type="hidden" name="GlobalProblemHours" value="@Model.GlobalProblemHours" data-global-problem-hours-hidden="true" />
                                 <input type="hidden" name="GlobalProblemMinutes" value="@Model.GlobalProblemMinutes" data-global-problem-minutes-hidden="true" />
                                 <input type="hidden" name="ProblemNotesJson" value="@JsonSerializer.Serialize(ProblemNotes)" data-problem-notes-hidden="true" />
-                                @if (ProblemNotes.Count > 1)
-                                {
-                                    <div class="screen4-problem-list" data-problem-notes-list="true">
-                                        @for (var index = 0; index < ProblemNotes.Count; index++)
-                                        {
-                                            var note = ProblemNotes[index];
-                                            <div class="screen4-problem-list-item">
-                                                <span>@FormatProblemNote(note)</span>
-                                                <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNoteAsync(index)">×</button>
-                                            </div>
-                                        }
-                                    </div>
-                                }
+                                <div class="screen4-problem-list" data-problem-notes-list="true" hidden="@(ProblemNotes.Count <= 1)">
+                                    @for (var index = 0; index < ProblemNotes.Count; index++)
+                                    {
+                                        var note = ProblemNotes[index];
+                                        <div class="screen4-problem-list-item">
+                                            <span>@FormatProblemNote(note)</span>
+                                            <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNoteAsync(index)">×</button>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         </div>
                     }
@@ -268,9 +269,9 @@
                                                 </div>
                                             </td>
                                         </tr>
-                                        @if (launch.HasPreviousDeclarations && ExpandedHistoryOrderIds.Contains(launch.OrderId))
+                                        @if (launch.HasPreviousDeclarations)
                                         {
-                                            <tr class="screen4-history-row" id="@historyRowId" data-history-row="true">
+                                            <tr class="screen4-history-row@(ExpandedHistoryOrderIds.Contains(launch.OrderId) ? string.Empty : " is-hidden")" id="@historyRowId" data-history-row="true">
                                                 <td colspan="7">
                                                     <div class="screen4-history-wrap">
                                                         <div class="screen4-history-title">Dichiarazioni precedenti</div>
