@@ -1346,9 +1346,9 @@
             {
                 var confirmed = await JsRuntime.InvokeAsync<bool>(
                     "molinaBlazorDialog.confirm",
-                    "Ci sono lotti disponibili in giacenza. Vuoi proseguire comunque senza dichiarare il lotto materiale?",
+                    "Ci sono lotti disponibili in giacenza. Vuoi salvare comunque senza dichiarare il lotto materiale?",
                     "Conferma senza lotto",
-                    "Prosegui senza lotto",
+                    "Salva senza lotto",
                     "Torna ai dati",
                     "!");
                 if (!confirmed)
