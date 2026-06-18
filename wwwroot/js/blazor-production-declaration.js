@@ -19,6 +19,17 @@
                     element.focus();
                 }
             }, 30);
+        },
+        focusAndSelectById: function (id) {
+            window.setTimeout(function () {
+                var element = document.getElementById(id);
+                if (element && typeof element.focus === "function") {
+                    element.focus();
+                }
+                if (element && typeof element.select === "function") {
+                    element.select();
+                }
+            }, 30);
         }
     };
 

@@ -50,13 +50,14 @@
                         <span class="screen4-detail-label">Data</span>
                         <div class="screen4-date-box">
                             <input type="date"
+                                   id="screen4DeclarationDateInput"
                                    value="@Model.DeclarationDate.ToString("yyyy-MM-dd")"
                                    class="screen4-date-input"
                                    disabled="@(!Model.IsDeclarationDateEditable)"
                                    @onchange="OnDeclarationDateChanged" />
                             @if (Model.CanRequestDateEdit)
                             {
-                                <button type="button" class="screen4-inline-button screen4-inline-button--secondary" @onclick="OpenDatePinModal">
+                                <button type="button" class="screen4-inline-button screen4-inline-button--secondary" @onclick="RequestDateEditAsync">
                                     @(Model.IsDeclarationDateEditable ? "Data sbloccata" : "Modifica data")
                                 </button>
                             }
@@ -282,12 +283,13 @@
                        pattern="[0-9]*"
                        autocomplete="off"
                        value="@DatePin"
-                       @oninput="OnDatePinInput" />
+                       @oninput="OnDatePinInput"
+                       @onkeydown="HandleDatePinKeydownAsync" />
                 <div class="screen4-date-pin-modal__help">@DatePinMessage</div>
                 <div class="screen4-qty-keypad screen4-date-pin-modal__keypad" aria-label="Tastierino numerico PIN">
                     @foreach (var key in PinKeys)
                     {
-                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressDatePinKey(key)">
+                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressDatePinKeyAsync(key)">
                             @(key == "Del" ? "⌫" : key)
                         </button>
                     }
@@ -1081,6 +1083,17 @@
         return $"{noteType}: {FormatTime(note.Hours, note.Minutes)}{description}";
     }
 
+    private async Task RequestDateEditAsync()
+    {
+        if (Model?.IsDeclarationDateEditable == true)
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "screen4DeclarationDateInput");
+            return;
+        }
+
+        OpenDatePinModal();
+    }
+
     private void OpenDatePinModal()
     {
         DatePin = string.Empty;
@@ -1101,21 +1114,30 @@
         DatePin = NormalizeDatePin(args.Value?.ToString());
     }
 
-    private void PressDatePinKey(string key)
+    private async Task PressDatePinKeyAsync(string key)
     {
         if (key == "C")
         {
             DatePin = string.Empty;
-            return;
         }
-
-        if (key == "Del")
+        else if (key == "Del")
         {
             DatePin = DatePin.Length == 0 ? string.Empty : DatePin[..^1];
-            return;
+        }
+        else
+        {
+            DatePin = NormalizeDatePin(DatePin + key);
         }
 
-        DatePin = NormalizeDatePin(DatePin + key);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "screen4DatePinInput");
+    }
+
+    private async Task HandleDatePinKeydownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await ConfirmDatePinAsync();
+        }
     }
 
     private async Task ConfirmDatePinAsync()
@@ -1129,13 +1151,16 @@
         DatePinMessage = result.Message;
         if (!result.Success)
         {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.Message, "warning");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusAndSelectById", "screen4DatePinInput");
             return;
         }
 
         await FlowState.SetDateEditAuthorizedAsync(true);
         Model.IsDeclarationDateEditable = true;
-        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.Message, "success");
         CloseDatePinModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.Message, "success");
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "screen4DeclarationDateInput");
     }
 
     private static string NormalizeDatePin(string? value)
