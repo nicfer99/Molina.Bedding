@@ -1178,10 +1178,10 @@
         ValidationMessage = null;
         var postModel = BuildPostModel();
         var timingMinutes = postModel.GetTimingMinutesPerOperator();
-        if (timingMinutes <= 0)
+        if (Model.IsTimingOnlyMode && timingMinutes <= 0)
         {
             ValidationMessage = "Inserisci il timing prima di premere Inserisci.";
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
@@ -1191,7 +1191,14 @@
             if (declaredRows.Count == 0)
             {
                 ValidationMessage = "Inserisci almeno una qta dichiarata prima di premere Inserisci.";
-                await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+                await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
+                return;
+            }
+
+            if (timingMinutes <= 0)
+            {
+                ValidationMessage = "Inserisci il timing prima di premere Inserisci.";
+                await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
                 return;
             }
 
@@ -1259,7 +1266,7 @@
                 ValidationMessage = result.Message;
             }
 
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage ?? "Non riesco a inserire la dichiarazione.");
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage ?? "Non riesco a inserire la dichiarazione.", "warning");
             return;
         }
 
