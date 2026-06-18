@@ -1178,16 +1178,33 @@
             return "Nessuna nota produzione o blocco";
         }
 
-        return ProblemNotes.Count == 1
-            ? FormatProblemNote(ProblemNotes[0])
-            : $"{ProblemNotes.Count} note produzione o blocchi";
+        if (ProblemNotes.Count == 1)
+        {
+            return FormatProblemNote(ProblemNotes[0]);
+        }
+
+        var totalMinutes = ProblemNotes.Sum(static note => note.TotalMinutes);
+        return $"Totale: {FormatTime(totalMinutes / 60, totalMinutes % 60).Replace(" h ", " h e ")}";
     }
 
     private string FormatProblemNote(Screen4ProblemNotePostItemModel note)
     {
-        var noteType = Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == note.NoteTypeId)?.Description ?? "Nota";
-        var description = string.IsNullOrWhiteSpace(note.Description) ? string.Empty : $" - {note.Description}";
-        return $"{noteType}: {FormatTime(note.Hours, note.Minutes)}{description}";
+        var parts = new List<string>
+        {
+            Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == note.NoteTypeId)?.Description ?? "Nota produzione/blocco"
+        };
+
+        if (!string.IsNullOrWhiteSpace(note.Description))
+        {
+            parts.Add(note.Description.Trim());
+        }
+
+        if (note.TotalMinutes > 0)
+        {
+            parts.Add($"({FormatTime(note.TotalMinutes / 60, note.TotalMinutes % 60)})");
+        }
+
+        return string.Join(" ", parts);
     }
 
     private async Task RequestDateEditAsync()
