@@ -130,7 +130,7 @@
                                             data-open-launch-direct-modal="true"
                                             aria-label="Modifica il lotto selezionato in Schermata 3"
                                             @onclick:stopPropagation="true"
-                                            @onclick="() => OpenDirectModal(launch)">
+                                            @onclick="() => OpenDirectModalAsync(launch)">
                                         <span data-launch-prefill-lot="true">@(hasPrefill && !string.IsNullOrWhiteSpace(prefill?.SelectedMaterialLotCode) ? prefill.SelectedMaterialLotCode : "Nessun lotto selezionato")</span>
                                     </button>
                                 </div>
@@ -185,8 +185,16 @@
                         </div>
 
                         <div class="launch-direct-qty-actions" aria-label="Scelta quantità">
-                            <button type="button" class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action" data-launch-direct-set-max="true" @onclick="SetDirectMax">Max</button>
-                            <button type="button" class="screen4-slot-button screen4-slot-button--partial launch-direct-qty-action" data-launch-direct-open-partial="true" @onclick="OpenDirectPartialModal">
+                            <button type="button"
+                                    class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action@(DirectQuantityMode == "max" ? " is-active" : string.Empty)"
+                                    data-launch-direct-set-max="true"
+                                    aria-pressed="@(DirectQuantityMode == "max" ? "true" : "false")"
+                                    @onclick="SetDirectMax">Max</button>
+                            <button type="button"
+                                    class="screen4-slot-button screen4-slot-button--partial launch-direct-qty-action@(DirectQuantityMode == "partial" ? " is-active" : string.Empty)"
+                                    data-launch-direct-open-partial="true"
+                                    aria-pressed="@(DirectQuantityMode == "partial" ? "true" : "false")"
+                                    @onclick="OpenDirectPartialModalAsync">
                                 Qta Parziale
                             </button>
                         </div>
@@ -299,12 +307,20 @@
     private string DirectQuantity { get; set; } = string.Empty;
     private string DirectPartialQuantity { get; set; } = string.Empty;
     private string DirectMaterialLotCode { get; set; } = string.Empty;
+    private string DirectQuantityMode { get; set; } = string.Empty;
+    private string? PendingFocusSelector { get; set; }
     private bool ShowDirectPartialModal { get; set; }
     private DotNetObjectReference<BlazorLaunches>? BarcodeReference { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await SyncModalStateAsync();
+        if (!string.IsNullOrWhiteSpace(PendingFocusSelector))
+        {
+            var selector = PendingFocusSelector;
+            PendingFocusSelector = null;
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusBySelector", selector);
+        }
 
         if (!firstRender)
         {
@@ -499,7 +515,7 @@
         if (AutoInsertOnBarcode && GetRemainingQuantity(launch) > 0)
         {
             await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Lotto acquisito. Imposta qta e lotto, poi completa il timing in Schermata 4.", "success");
-            OpenDirectModal(launch);
+            await OpenDirectModalAsync(launch);
             return true;
         }
 
@@ -535,6 +551,18 @@
         return PrefillSelections.TryGetValue(orderId, out var item) ? item : null;
     }
 
+    private async Task OpenDirectModalAsync(ProductionLaunchItemViewModel launch)
+    {
+        if (GetRemainingQuantity(launch) <= 0)
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "La qta da produrre è già stata completata per questo lotto.", "warning");
+            PendingFocusSelector = "#lotBarcode";
+            return;
+        }
+
+        OpenDirectModal(launch);
+    }
+
     private void OpenDirectModal(ProductionLaunchItemViewModel launch)
     {
         ActiveDirectLaunch = launch;
@@ -547,7 +575,27 @@
         }
 
         DirectPartialQuantity = DirectQuantity;
+        var parsedQuantity = ParseQuantity(DirectQuantity);
+        var remainingQuantity = GetRemainingQuantity(launch);
+        if (parsedQuantity.HasValue && Math.Abs(parsedQuantity.Value - remainingQuantity) < 0.0001m)
+        {
+            DirectQuantityMode = "max";
+        }
+        else if (parsedQuantity.HasValue && parsedQuantity.Value > 0)
+        {
+            DirectQuantityMode = "partial";
+        }
+        else
+        {
+            DirectQuantityMode = string.Empty;
+        }
+
         ShowDirectPartialModal = false;
+        PendingFocusSelector = DirectQuantityMode == "partial"
+            ? "[data-launch-direct-open-partial='true']"
+            : Model?.RequiresMaterialLotSelection == true && launch.AvailableMaterialLots.Count > 0
+                ? "[data-launch-direct-material-lot-reference]"
+                : "[data-launch-direct-set-max='true']";
     }
 
     private string GetDirectMaterialLotHelpText()
@@ -605,7 +653,9 @@
         DirectQuantity = string.Empty;
         DirectPartialQuantity = string.Empty;
         DirectMaterialLotCode = string.Empty;
+        DirectQuantityMode = string.Empty;
         ShowDirectPartialModal = false;
+        PendingFocusSelector = "#lotBarcode";
     }
 
     private ValueTask SyncModalStateAsync()
@@ -621,37 +671,55 @@
         }
 
         DirectQuantity = FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch));
+        DirectPartialQuantity = DirectQuantity;
+        DirectQuantityMode = "max";
     }
 
-    private void OpenDirectPartialModal()
+    private async Task OpenDirectPartialModalAsync()
     {
+        if (ActiveDirectLaunch is null)
+        {
+            return;
+        }
+
+        if (GetRemainingQuantity(ActiveDirectLaunch) <= 0)
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "La qta da produrre è già stata completata per questo lotto.", "warning");
+            return;
+        }
+
+        DirectQuantityMode = "partial";
         DirectPartialQuantity = DirectQuantity;
         ShowDirectPartialModal = true;
+        PendingFocusSelector = "#launchDirectPartialQuantityModal [data-launch-direct-partial-keypad-value]";
     }
 
     private void CloseDirectPartialModal()
     {
         ShowDirectPartialModal = false;
-        DirectPartialQuantity = DirectQuantity;
     }
 
     private void ClearDirectPartialQuantity()
     {
         DirectPartialQuantity = string.Empty;
         DirectQuantity = string.Empty;
+        DirectQuantityMode = "partial";
     }
 
     private void PressDirectPartialKey(string key)
     {
+        DirectQuantityMode = "partial";
         if (key == "C")
         {
             DirectPartialQuantity = string.Empty;
+            DirectQuantity = DirectPartialQuantity;
             return;
         }
 
         if (key == "Del")
         {
             DirectPartialQuantity = DirectPartialQuantity.Length == 0 ? string.Empty : DirectPartialQuantity[..^1];
+            DirectQuantity = DirectPartialQuantity;
             return;
         }
 
@@ -663,11 +731,12 @@
         DirectPartialQuantity = key == "," && string.IsNullOrWhiteSpace(DirectPartialQuantity)
             ? "0,"
             : DirectPartialQuantity + key;
+        DirectQuantity = DirectPartialQuantity;
     }
 
     private async Task ConfirmDirectPartialQuantityAsync()
     {
-        var value = ParseQuantity(DirectPartialQuantity);
+        var value = ParseQuantity(DirectQuantity);
         if (!value.HasValue || value.Value <= 0)
         {
             ValidationMessage = "Inserisci una qta dichiarata valida.";
@@ -676,7 +745,10 @@
         }
 
         DirectQuantity = FormatQuantity(value.Value);
+        DirectPartialQuantity = DirectQuantity;
+        DirectQuantityMode = "partial";
         ShowDirectPartialModal = false;
+        PendingFocusSelector = "[data-launch-direct-open-partial='true']";
     }
 
     private async Task ConfirmDirectInsertAsync()

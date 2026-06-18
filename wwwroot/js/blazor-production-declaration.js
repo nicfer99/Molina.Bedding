@@ -31,6 +31,14 @@
                 }
             }, 30);
         },
+        focusBySelector: function (selector) {
+            window.setTimeout(function () {
+                var element = document.querySelector(selector);
+                if (element && typeof element.focus === "function") {
+                    element.focus();
+                }
+            }, 30);
+        },
         scrollLaunchCardIntoView: function (orderId) {
             var element = document.querySelector("[data-order-id='" + String(orderId || "") + "']");
             if (element && typeof element.scrollIntoView === "function") {
