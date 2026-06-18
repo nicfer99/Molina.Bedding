@@ -691,9 +691,10 @@
         }
 
         LoadModel(null, null);
+        await ShowInitialMessageAsync();
         if (Model?.AutoFillMaxQuantityFromBarcode == true)
         {
-            AutoFillMaxQuantities();
+            await AutoFillMaxQuantitiesAsync();
             await FlowState.ConsumeAutoFillMaxQuantityAsync();
         }
 
@@ -706,6 +707,18 @@
         ValidationMessage = Model.ValidationMessage;
         SuccessMessage = Model.SuccessMessage;
         LoadProblemNotesFromModel();
+    }
+
+    private async Task ShowInitialMessageAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ValidationMessage))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
+        }
+        else if (!string.IsNullOrWhiteSpace(SuccessMessage))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", SuccessMessage, "success");
+        }
     }
 
     private ValueTask SyncModalStateAsync()
@@ -741,27 +754,40 @@
         }
     }
 
-    private void AutoFillMaxQuantities()
+    private async Task AutoFillMaxQuantitiesAsync()
     {
-        if (Model is null)
+        if (Model is null || Model.IsTimingOnlyMode || Model.SelectedLaunches.Count != 1)
         {
             return;
         }
 
-        foreach (var launch in Model.SelectedLaunches)
+        var launch = Model.SelectedLaunches[0];
+        var remaining = GetRemainingQuantity(launch);
+        if (remaining <= 0)
         {
-            var remaining = GetRemainingQuantity(launch);
-            if (remaining > 0)
-            {
-                launch.QuantityDeclared = remaining;
-                if (Model.RequiresMaterialLotSelection && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
-                {
-                    launch.SelectedMaterialLotCode = launch.AvailableMaterialLots[0];
-                }
-            }
+            return;
         }
 
+        launch.QuantityDeclared = remaining;
+        if (Model.RequiresMaterialLotSelection && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
+        {
+            launch.SelectedMaterialLotCode = launch.AvailableMaterialLots[0];
+        }
+
+        if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
+        {
+            ConfirmedMissingMaterialLotOrderIds.Remove(launch.OrderId);
+        }
+
+        ConfirmedOverLimitOrderIds.Remove(launch.OrderId);
         UpdateTotalDeclared();
+        var hasMaterialLot = !Model.RequiresMaterialLotSelection || !string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode);
+        await JsRuntime.InvokeVoidAsync(
+            "molinaBlazorDialog.toast",
+            hasMaterialLot
+                ? "Qta dichiarata impostata al massimo disponibile."
+                : "Qta dichiarata impostata al massimo disponibile. Se necessario seleziona il lotto.",
+            hasMaterialLot ? "success" : "info");
     }
 
     private string GetLineDisplayTitle()
@@ -893,7 +919,7 @@
         if (!value.HasValue || value.Value <= 0)
         {
             ValidationMessage = "Inserisci una qta dichiarata valida.";
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
