@@ -264,11 +264,11 @@
 {
     <div class="screen4-qty-modal" id="screen4DatePinModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseDatePinModal"></div>
-        <div class="screen4-qty-modal__dialog screen4-date-pin-modal" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog screen4-date-pin-modal" role="dialog" aria-modal="true" aria-labelledby="screen4DatePinModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Modifica data</div>
-                    <h2>Inserisci il PIN</h2>
+                    <h2 id="screen4DatePinModalTitle">Inserisci il PIN</h2>
                     <p class="screen4-date-pin-modal__intro">Per sbloccare la data usa il PIN dell'operatore abilitato.</p>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal">×</button>
@@ -307,11 +307,11 @@
 {
     <div class="screen4-qty-modal" id="screen4QuantityModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseQuantityModal"></div>
-        <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4QuantityModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Quantità parziale</div>
-                    <h2>Inserisci la quantità dichiarata</h2>
+                    <h2 id="screen4QuantityModalTitle">Inserisci la quantità dichiarata</h2>
                     <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal">×</button>
@@ -351,11 +351,11 @@
 {
     <div class="screen4-qty-modal" id="screen4MaterialLotModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseMaterialLotModal"></div>
-        <div class="screen4-qty-modal__dialog screen4-material-lot-modal" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog screen4-material-lot-modal" role="dialog" aria-modal="true" aria-labelledby="screen4MaterialLotModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Lotto</div>
-                    <h2>Inserisci il lotto</h2>
+                    <h2 id="screen4MaterialLotModalTitle">Inserisci il lotto</h2>
                     <div class="material-lot-article-summary">
                         <span>@ActiveMaterialLotLaunch.ArticleCode</span>
                         <strong>@ActiveMaterialLotLaunch.ArticleDescription</strong>
@@ -391,11 +391,11 @@
 {
     <div class="screen4-time-modal" id="screen4TimingModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseTimingModal"></div>
-        <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4TimingModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Timing totale</div>
-                    <h2>Inserisci il timing</h2>
+                    <h2 id="screen4TimingModalTitle">Inserisci il timing</h2>
                     <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal">×</button>
@@ -437,11 +437,11 @@
 {
     <div class="screen4-time-modal" id="screen4ProblemModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseProblemModal"></div>
-        <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4ProblemModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Note produzione o blocchi</div>
-                    <h2>NOTE PRODUZIONE O BLOCCHI</h2>
+                    <h2 id="screen4ProblemModalTitle">NOTE PRODUZIONE O BLOCCHI</h2>
                     <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal">×</button>

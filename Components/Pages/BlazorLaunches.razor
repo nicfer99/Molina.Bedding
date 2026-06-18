@@ -147,11 +147,11 @@
 {
     <div class="screen4-qty-modal" id="launchDirectInsertModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseDirectModal"></div>
-        <div class="screen4-qty-modal__dialog launch-direct-modal" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog launch-direct-modal" role="dialog" aria-modal="true" aria-labelledby="launchDirectInsertModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Schermata 3</div>
-                    <h2>Dati da riportare in Schermata 4</h2>
+                    <h2 id="launchDirectInsertModalTitle">Dati da riportare in Schermata 4</h2>
                     <div class="screen4-modal-lot">@ActiveDirectLaunch.LotCode</div>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectModal" aria-label="Chiudi finestra">×</button>
@@ -231,11 +231,11 @@
 {
     <div class="screen4-qty-modal" id="launchDirectPartialQuantityModal">
         <div class="screen4-qty-modal__backdrop" @onclick="CloseDirectPartialModal"></div>
-        <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true">
+        <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="launchDirectPartialQuantityModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Quantità parziale</div>
-                    <h2>Inserisci la quantità dichiarata</h2>
+                    <h2 id="launchDirectPartialQuantityModalTitle">Inserisci la quantità dichiarata</h2>
                     <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata per il lotto selezionato. Se supera il residuo disponibile, ti verrà chiesta una conferma dedicata.</p>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectPartialModal" aria-label="Chiudi finestra">×</button>
