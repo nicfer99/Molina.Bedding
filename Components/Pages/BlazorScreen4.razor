@@ -81,7 +81,7 @@
                                 <span>@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</span>
                                 @if (Model.GlobalTimingHours > 0 || Model.GlobalTimingMinutes > 0)
                                 {
-                                    <button type="button" class="screen4-summary-clear" title="Annulla timing" @onclick="ClearTiming">x</button>
+                                    <button type="button" class="screen4-summary-clear" title="Annulla timing" @onclick="ClearTiming">×</button>
                                 }
                             </div>
                         </div>
@@ -110,7 +110,7 @@
                                     <span>@GetProblemSummary()</span>
                                     @if (ProblemNotes.Count > 0)
                                     {
-                                        <button type="button" class="screen4-summary-clear" title="Rimuovi note" @onclick="ClearProblemNotes">x</button>
+                                        <button type="button" class="screen4-summary-clear" title="Rimuovi note" @onclick="ClearProblemNotes">×</button>
                                     }
                                 </div>
                                 @if (ProblemNotes.Count > 1)
@@ -121,7 +121,7 @@
                                             var note = ProblemNotes[index];
                                             <div class="screen4-problem-list-item">
                                                 <span>@FormatProblemNote(note)</span>
-                                                <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNote(index)">x</button>
+                                                <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNote(index)">×</button>
                                             </div>
                                         }
                                     </div>
@@ -268,7 +268,7 @@
                     <h2>Inserisci il PIN</h2>
                     <p class="screen4-date-pin-modal__intro">Per sbloccare la data usa il PIN dell'operatore abilitato.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <label class="screen4-date-pin-modal__label" for="screen4DatePinInput">PIN operatore</label>
@@ -292,11 +292,11 @@
         <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true">
             <div class="screen4-qty-modal__header">
                 <div>
-                    <div class="page-kicker">Quantita parziale</div>
-                    <h2>Inserisci la quantita dichiarata</h2>
-                    <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata per il lotto selezionato.</p>
+                    <div class="page-kicker">Quantità parziale</div>
+                    <h2>Inserisci la quantità dichiarata</h2>
+                    <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <div class="screen4-qty-modal__info">
@@ -312,7 +312,9 @@
                 <div class="screen4-qty-keypad">
                     @foreach (var key in QuantityKeys)
                     {
-                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressQuantityKey(key)">@key</button>
+                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressQuantityKey(key)">
+                            @(key == "Del" ? "⌫" : key)
+                        </button>
                     }
                 </div>
             </div>
@@ -320,7 +322,7 @@
                 <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearActiveQuantity">Annulla qta dichiarata</button>
                 <div class="screen4-qty-footer-actions">
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseQuantityModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmQuantity">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmQuantityAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -341,7 +343,7 @@
                         <strong>@ActiveMaterialLotLaunch.ArticleDescription</strong>
                     </div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal">×</button>
             </div>
             <div class="screen4-qty-modal__content">
                 <div class="material-lot-scan-help">Seleziona il lotto toccando uno dei lotti disponibili.</div>
@@ -378,7 +380,7 @@
                     <h2>Inserisci il timing</h2>
                     <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal">×</button>
             </div>
             <div class="screen4-time-display-panel">
                 <div class="screen4-time-display-main">@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</div>
@@ -424,7 +426,7 @@
                     <h2>NOTE PRODUZIONE O BLOCCHI</h2>
                     <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal">×</button>
             </div>
 
             <div class="screen4-problem-note-type">
@@ -699,7 +701,7 @@
             : QuantityKeypadValue + key;
     }
 
-    private void ConfirmQuantity()
+    private async Task ConfirmQuantityAsync()
     {
         if (ActiveQuantityLaunch is null)
         {
@@ -710,6 +712,7 @@
         if (!value.HasValue || value.Value <= 0)
         {
             ValidationMessage = "Inserisci una qta dichiarata valida.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
             return;
         }
 
@@ -973,7 +976,13 @@
                 && !ConfirmedOverLimitOrderIds.Contains(launch.OrderId));
             if (overLimitLaunch is not null)
             {
-                var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", $"La qta dichiarata per il lotto {overLimitLaunch.LotCode} supera la qta residua disponibile. Confermi?");
+                var confirmed = await JsRuntime.InvokeAsync<bool>(
+                    "molinaBlazorDialog.confirm",
+                    "La qta dichiarata supera la qta residua disponibile per questo lotto. Tocca Conferma comunque solo se vuoi registrarla davvero.",
+                    "Conferma qta superiore al residuo",
+                    "Conferma comunque",
+                    "Torna ai dati",
+                    "!");
                 if (!confirmed)
                 {
                     return;
@@ -993,7 +1002,13 @@
                 : null;
             if (missingMaterialLotLaunch is not null)
             {
-                var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", "Ci sono lotti disponibili in giacenza. Vuoi salvare comunque senza dichiarare il lotto materiale?");
+                var confirmed = await JsRuntime.InvokeAsync<bool>(
+                    "molinaBlazorDialog.confirm",
+                    "Ci sono lotti disponibili in giacenza. Vuoi proseguire comunque senza dichiarare il lotto materiale?",
+                    "Conferma senza lotto",
+                    "Prosegui senza lotto",
+                    "Torna ai dati",
+                    "!");
                 if (!confirmed)
                 {
                     return;

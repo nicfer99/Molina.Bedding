@@ -80,7 +80,7 @@
                                 title="Togli dalla selezione"
                                 @onclick:stopPropagation="true"
                                 @onclick="() => RemoveLaunchAsync(launch.OrderId)">
-                            x
+                            ×
                         </button>
                         <span class="launch-card-code">@launch.LotCode</span>
                         @if (launch.IsClosed)
@@ -154,16 +154,16 @@
                     <h2>Dati da riportare in Schermata 4</h2>
                     <div class="screen4-modal-lot">@ActiveDirectLaunch.LotCode</div>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectModal" aria-label="Chiudi finestra">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectModal" aria-label="Chiudi finestra">×</button>
             </div>
 
             <div class="screen4-qty-modal__content launch-direct-modal__content">
                 <div class="launch-direct-modal__sections@(Model?.RequiresMaterialLotSelection == true ? string.Empty : " launch-direct-modal__sections--single")">
-                    <section class="launch-direct-panel launch-direct-panel--quantity" aria-label="Sezione quantita">
+                    <section class="launch-direct-panel launch-direct-panel--quantity" aria-label="Sezione quantità">
                         <div class="launch-direct-panel__header launch-direct-panel__header--stacked">
                             <div>
-                                <div class="page-kicker">Quantita</div>
-                                <strong class="launch-direct-panel__title">Imposta la quantita dichiarata</strong>
+                                <div class="page-kicker">Quantità</div>
+                                <strong class="launch-direct-panel__title">Imposta la quantità dichiarata</strong>
                                 <p class="screen4-qty-modal__intro launch-direct-panel__intro">Scegli se usare la qta massima residua oppure una qta parziale.</p>
                             </div>
                         </div>
@@ -179,20 +179,11 @@
                             </div>
                         </div>
 
-                        <div class="launch-direct-qty-actions" aria-label="Scelta quantita">
+                        <div class="launch-direct-qty-actions" aria-label="Scelta quantità">
                             <button type="button" class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action" @onclick="SetDirectMax">Max</button>
-                            <input class="screen4-date-input" inputmode="decimal" placeholder="Qta Parziale" @bind="DirectQuantity" />
-                        </div>
-
-                        <div class="screen4-time-grid">
-                            <div class="screen4-time-section">
-                                <div class="screen4-time-section__label">Ore timing</div>
-                                <input class="screen4-date-input" type="number" min="0" @bind="DirectTimingHours" />
-                            </div>
-                            <div class="screen4-time-section">
-                                <div class="screen4-time-section__label">Minuti timing</div>
-                                <input class="screen4-date-input" type="number" min="0" max="59" @bind="DirectTimingMinutes" />
-                            </div>
+                            <button type="button" class="screen4-slot-button screen4-slot-button--partial launch-direct-qty-action" @onclick="OpenDirectPartialModal">
+                                Qta Parziale
+                            </button>
                         </div>
                     </section>
 
@@ -233,9 +224,58 @@
     </div>
 }
 
+@if (ShowDirectPartialModal && ActiveDirectLaunch is not null)
+{
+    <div class="screen4-qty-modal" id="launchDirectPartialQuantityModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseDirectPartialModal"></div>
+        <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Quantità parziale</div>
+                    <h2>Inserisci la quantità dichiarata</h2>
+                    <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata per il lotto selezionato. Se supera il residuo disponibile, ti verrà chiesta una conferma dedicata.</p>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectPartialModal" aria-label="Chiudi finestra">×</button>
+            </div>
+
+            <div class="screen4-qty-modal__content">
+                <div class="screen4-qty-modal__info">
+                    <div class="screen4-qty-modal__info-box">
+                        <span class="note-label">Qta residua</span>
+                        <strong>@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
+                    </div>
+                    <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
+                        <span class="note-label">Qta dichiarata</span>
+                        <strong>@(string.IsNullOrWhiteSpace(DirectPartialQuantity) ? "0" : DirectPartialQuantity)</strong>
+                    </div>
+                </div>
+
+                <div class="screen4-qty-keypad">
+                    @foreach (var key in QuantityKeys)
+                    {
+                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressDirectPartialKey(key)">
+                            @(key == "Del" ? "⌫" : key)
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearDirectPartialQuantity">Annulla qta dichiarata</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseDirectPartialModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmDirectPartialQuantityAsync">Conferma</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public string ActionId { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "productionMode")] public string? ProductionMode { get; set; }
+
+    private static readonly string[] QuantityKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "Del", ","];
 
     private ProductionLaunchSelectionViewModel? Model { get; set; }
     private HashSet<int> SelectedOrderIds { get; } = [];
@@ -246,10 +286,9 @@
     private string? SuccessMessage { get; set; }
     private ProductionLaunchItemViewModel? ActiveDirectLaunch { get; set; }
     private string DirectQuantity { get; set; } = string.Empty;
+    private string DirectPartialQuantity { get; set; } = string.Empty;
     private string DirectMaterialLotCode { get; set; } = string.Empty;
-    private int DirectTimingHours { get; set; }
-    private int DirectTimingMinutes { get; set; }
-    private bool DirectConfirmOverLimit { get; set; }
+    private bool ShowDirectPartialModal { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -434,19 +473,17 @@
             DirectMaterialLotCode = launch.AvailableMaterialLots[0];
         }
 
-        DirectTimingHours = 0;
-        DirectTimingMinutes = 0;
-        DirectConfirmOverLimit = false;
+        DirectPartialQuantity = DirectQuantity;
+        ShowDirectPartialModal = false;
     }
 
     private void CloseDirectModal()
     {
         ActiveDirectLaunch = null;
         DirectQuantity = string.Empty;
+        DirectPartialQuantity = string.Empty;
         DirectMaterialLotCode = string.Empty;
-        DirectTimingHours = 0;
-        DirectTimingMinutes = 0;
-        DirectConfirmOverLimit = false;
+        ShowDirectPartialModal = false;
     }
 
     private void SetDirectMax()
@@ -459,6 +496,62 @@
         DirectQuantity = FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch));
     }
 
+    private void OpenDirectPartialModal()
+    {
+        DirectPartialQuantity = DirectQuantity;
+        ShowDirectPartialModal = true;
+    }
+
+    private void CloseDirectPartialModal()
+    {
+        ShowDirectPartialModal = false;
+        DirectPartialQuantity = DirectQuantity;
+    }
+
+    private void ClearDirectPartialQuantity()
+    {
+        DirectPartialQuantity = string.Empty;
+        DirectQuantity = string.Empty;
+    }
+
+    private void PressDirectPartialKey(string key)
+    {
+        if (key == "C")
+        {
+            DirectPartialQuantity = string.Empty;
+            return;
+        }
+
+        if (key == "Del")
+        {
+            DirectPartialQuantity = DirectPartialQuantity.Length == 0 ? string.Empty : DirectPartialQuantity[..^1];
+            return;
+        }
+
+        if (key == "," && DirectPartialQuantity.Contains(',', StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        DirectPartialQuantity = key == "," && string.IsNullOrWhiteSpace(DirectPartialQuantity)
+            ? "0,"
+            : DirectPartialQuantity + key;
+    }
+
+    private async Task ConfirmDirectPartialQuantityAsync()
+    {
+        var value = ParseQuantity(DirectPartialQuantity);
+        if (!value.HasValue || value.Value <= 0)
+        {
+            ValidationMessage = "Inserisci una qta dichiarata valida.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            return;
+        }
+
+        DirectQuantity = FormatQuantity(value.Value);
+        ShowDirectPartialModal = false;
+    }
+
     private async Task ConfirmDirectInsertAsync()
     {
         if (ActiveDirectLaunch is null)
@@ -466,55 +559,74 @@
             return;
         }
 
+        var parsedQuantity = ParseQuantity(DirectQuantity);
+        if (!parsedQuantity.HasValue || parsedQuantity.Value <= 0)
+        {
+            ValidationMessage = "Inserisci una qta dichiarata valida.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            return;
+        }
+
+        if (Model?.RequiresMaterialLotSelection == true && string.IsNullOrWhiteSpace(DirectMaterialLotCode))
+        {
+            var singleLot = ActiveDirectLaunch.AvailableMaterialLots.Count == 1
+                ? ActiveDirectLaunch.AvailableMaterialLots[0]
+                : string.Empty;
+            if (!string.IsNullOrWhiteSpace(singleLot))
+            {
+                DirectMaterialLotCode = singleLot;
+            }
+        }
+
+        async Task FinalizeDirectInsertAsync()
+        {
+            SelectedOrderIds.Add(ActiveDirectLaunch.OrderId);
+            PrefillSelections[ActiveDirectLaunch.OrderId] = new ProductionLaunchPrefillSelectionItem
+            {
+                OrderId = ActiveDirectLaunch.OrderId,
+                QuantityDeclared = FormatQuantity(parsedQuantity.Value),
+                SelectedMaterialLotCode = DirectMaterialLotCode?.Trim() ?? string.Empty
+            };
+
+            await PersistSelectionAsync(false);
+            CloseDirectModal();
+            await LoadModelAsync(null, null);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Dati salvati in Schermata 3. Premi Avanti per completare il timing in Schermata 4.");
+        }
+
         if (Model?.RequiresMaterialLotSelection == true
             && string.IsNullOrWhiteSpace(DirectMaterialLotCode)
             && ActiveDirectLaunch.AvailableMaterialLots.Count > 0)
         {
-            var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", "Ci sono lotti disponibili in giacenza. Vuoi salvare comunque senza dichiarare il lotto materiale?");
+            var confirmed = await JsRuntime.InvokeAsync<bool>(
+                "molinaBlazorDialog.confirm",
+                "Ci sono lotti disponibili in giacenza. Vuoi proseguire comunque senza dichiarare il lotto materiale?",
+                "Conferma senza lotto",
+                "Prosegui senza lotto",
+                "Torna ai dati",
+                "!");
             if (!confirmed)
             {
                 return;
             }
         }
 
-        var postModel = new ProductionLaunchDirectInsertPostModel
+        if (parsedQuantity.Value > GetRemainingQuantity(ActiveDirectLaunch))
         {
-            ActionId = ActionId,
-            ProductionMode = FlowService.NormalizeProductionMode(ProductionMode) ?? FlowState.ProductionMode,
-            AutoInsertOnBarcodeEnabled = AutoInsertOnBarcode,
-            OrderId = ActiveDirectLaunch.OrderId,
-            QuantityDeclared = DirectQuantity,
-            SelectedMaterialLotCode = DirectMaterialLotCode,
-            TimingHours = DirectTimingHours,
-            TimingMinutes = DirectTimingMinutes,
-            ConfirmOverLimit = DirectConfirmOverLimit
-        };
-
-        var result = FlowService.InsertDirectDeclaration(FlowState, postModel);
-        if (!result.Success && result.Message?.Contains("supera la qta residua", StringComparison.OrdinalIgnoreCase) == true && !DirectConfirmOverLimit)
-        {
-            var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", result.Message);
-            if (confirmed)
+            var confirmed = await JsRuntime.InvokeAsync<bool>(
+                "molinaBlazorDialog.confirm",
+                "La qta dichiarata supera la qta residua disponibile per questo lotto. Tocca Conferma comunque solo se vuoi registrarla davvero.",
+                "Conferma qta superiore al residuo",
+                "Conferma comunque",
+                "Torna ai dati",
+                "!");
+            if (!confirmed)
             {
-                DirectConfirmOverLimit = true;
-                await ConfirmDirectInsertAsync();
+                return;
             }
-
-            return;
         }
 
-        if (!result.Success)
-        {
-            ValidationMessage = result.Message;
-            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage ?? "Non riesco a inserire la dichiarazione.");
-            return;
-        }
-
-        SelectedOrderIds.Clear();
-        PrefillSelections.Clear();
-        await PersistSelectionAsync(false);
-        CloseDirectModal();
-        await LoadModelAsync(null, result.Message);
+        await FinalizeDirectInsertAsync();
     }
 
     private decimal GetRemainingQuantity(ProductionLaunchItemViewModel launch)
@@ -525,5 +637,22 @@
     private static string FormatQuantity(decimal value)
     {
         return value.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
+    }
+
+    private static decimal? ParseQuantity(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return null;
+        }
+
+        var normalizedValue = rawValue
+            .Trim()
+            .Replace(" ", string.Empty)
+            .Replace(",", ".");
+
+        return decimal.TryParse(normalizedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
     }
 }

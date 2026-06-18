@@ -1,0 +1,37 @@
+.work-area-actions .dx-action-button {
+    border: 1px solid #cadbf4;
+    border-radius: 22px;
+    box-shadow: 0 16px 34px rgba(18, 54, 107, 0.12);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 1.1rem;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    white-space: normal;
+}
+
+.work-area-actions .dx-action-button::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 6px;
+}
+
+.work-area-actions .dx-action-button:hover,
+.work-area-actions .dx-action-button:focus-visible {
+    outline: none;
+    transform: translateY(-1px);
+    box-shadow: 0 20px 40px rgba(18, 54, 107, 0.16);
+}
+
+.work-area-actions .dx-action-button:active {
+    transform: translateY(0);
+}
+
+.screen4-qty-modal,
+.screen4-time-modal {
+    z-index: 2500;
+}

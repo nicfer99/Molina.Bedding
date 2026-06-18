@@ -51,6 +51,10 @@
                             <div class="action-slot action-slot--large">
                                 <button type="button"
                                         class="dx-action-button dx-action-button--large dx-action-button--@action.Tone"
+                                        data-action-id="@action.Id"
+                                        data-action-text="@action.Text"
+                                        data-action-icon="@action.Icon"
+                                        data-action-tone="@action.Tone"
                                         @onclick="() => OpenActionAsync(action.Id)">
                                     @action.Text
                                 </button>
@@ -75,9 +79,9 @@
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Linea Trapunte</div>
-                    <h2>Scegli la modalita</h2>
+                    <h2>Scegli la modalità</h2>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">x</button>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="workmenu-mode-modal__content">
                 <button type="button" class="workmenu-mode-choice" @onclick="ContinueTrapunteRiempimentoAsync">Riempimento</button>
