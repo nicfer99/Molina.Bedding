@@ -100,10 +100,11 @@
                         </span>
                         @if (isSelected)
                         {
-                            <div class="launch-card-direct-summary" data-launch-prefill-summary="true">
+                            var hasPrefill = !string.IsNullOrWhiteSpace(prefill?.QuantityDeclared);
+                            <div class="launch-card-direct-summary@(hasPrefill ? string.Empty : " is-hidden")" data-launch-prefill-summary="true">
                                 <div class="launch-card-direct-summary__row">
                                     <span class="note-label">Qta impostata</span>
-                                    <strong>@(prefill?.QuantityDeclared ?? "-")</strong>
+                                    <strong data-launch-prefill-qty="true">@(hasPrefill ? prefill?.QuantityDeclared : "-")</strong>
                                 </div>
                                 @if (Model.RequiresMaterialLotSelection)
                                 {
@@ -114,7 +115,7 @@
                                                 aria-label="Modifica il lotto selezionato in Schermata 3"
                                                 @onclick:stopPropagation="true"
                                                 @onclick="() => OpenDirectModal(launch)">
-                                            <span>@(string.IsNullOrWhiteSpace(prefill?.SelectedMaterialLotCode) ? "Nessun lotto selezionato" : prefill.SelectedMaterialLotCode)</span>
+                                            <span data-launch-prefill-lot="true">@(hasPrefill && !string.IsNullOrWhiteSpace(prefill?.SelectedMaterialLotCode) ? prefill.SelectedMaterialLotCode : "Nessun lotto selezionato")</span>
                                         </button>
                                     </div>
                                 }
