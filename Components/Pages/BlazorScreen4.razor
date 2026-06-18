@@ -8,7 +8,8 @@
 <section class="page-section page-section--wide page-section--screen4"
          data-screen4-page="true"
          data-timing-only-mode="@(Model?.IsTimingOnlyMode.ToString().ToLowerInvariant() ?? "false")"
-         data-requires-material-lot-selection="@(Model?.RequiresMaterialLotSelection.ToString().ToLowerInvariant() ?? "false")">
+         data-requires-material-lot-selection="@(Model?.RequiresMaterialLotSelection.ToString().ToLowerInvariant() ?? "false")"
+         data-auto-fill-max-from-barcode="@(Model?.AutoFillMaxQuantityFromBarcode.ToString().ToLowerInvariant() ?? "false")">
     <header class="page-header page-header--compact">
         <div>
             <div class="page-kicker">Schermata 4</div>
@@ -53,11 +54,12 @@
                                    id="screen4DeclarationDateInput"
                                    value="@Model.DeclarationDate.ToString("yyyy-MM-dd")"
                                    class="screen4-date-input"
+                                   data-declaration-date-input="true"
                                    disabled="@(!Model.IsDeclarationDateEditable)"
                                    @onchange="OnDeclarationDateChanged" />
                             @if (Model.CanRequestDateEdit)
                             {
-                                <button type="button" class="screen4-inline-button screen4-inline-button--secondary" @onclick="RequestDateEditAsync">
+                                <button type="button" class="screen4-inline-button screen4-inline-button--secondary" data-request-date-edit="true" @onclick="RequestDateEditAsync">
                                     @(Model.IsDeclarationDateEditable ? "Data sbloccata" : "Modifica data")
                                 </button>
                             }
@@ -69,7 +71,7 @@
                         <div class="screen4-detail screen4-detail--total-produced-global">
                             <span class="screen4-detail-label">Qta dichiarata</span>
                             <div class="screen4-total-produced-box">
-                                <strong>@FormatQuantity(Model.TotalDeclared)</strong>
+                                <strong data-total-declared-value="true">@FormatQuantity(Model.TotalDeclared)</strong>
                             </div>
                         </div>
                     }
@@ -77,23 +79,26 @@
                     <div class="screen4-detail screen4-detail--timing-global">
                         <span class="screen4-detail-label">Timing totale</span>
                         <div class="screen4-global-timing-box">
-                            <button type="button" class="screen4-inline-button screen4-inline-button--stacked" @onclick="OpenTimingModal">Timing</button>
-                            <div class="screen4-time-display screen4-time-display--global">
-                                <span>@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</span>
+                            <button type="button" class="screen4-inline-button screen4-inline-button--stacked" data-open-global-timing="true" @onclick="OpenTimingModal">Timing</button>
+                            <div class="screen4-time-display screen4-time-display--global" data-global-timing-display="true">
+                                <span data-global-timing-text="true">@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</span>
                                 @if (Model.GlobalTimingHours > 0 || Model.GlobalTimingMinutes > 0)
                                 {
-                                    <button type="button" class="screen4-summary-clear" title="Annulla timing" @onclick="ClearTimingAsync">×</button>
+                                    <button type="button" class="screen4-summary-clear" data-clear-global-timing="true" aria-label="Annulla timing" title="Annulla timing" @onclick="ClearTimingAsync">×</button>
                                 }
                             </div>
+                            <input type="hidden" value="@Model.GlobalTimingHours" data-global-timing-hours-hidden="true" />
+                            <input type="hidden" value="@Model.GlobalTimingMinutes" data-global-timing-minutes-hidden="true" />
                         </div>
                     </div>
 
                     @if (IsGenericDeclaration && SelectedNoteRequiresAnnotation)
                     {
-                        <div class="screen4-detail screen4-detail--problem-global screen4-detail--note-description">
+                        <div class="screen4-detail screen4-detail--problem-global screen4-detail--note-description" data-note-description-field="true">
                             <span class="screen4-detail-label">Annotazione</span>
                             <div class="screen4-global-problem-box">
                                 <textarea class="screen4-problem-textarea"
+                                          data-note-description-input="true"
                                           rows="6"
                                           placeholder="Inserisci il testo annotazione"
                                           @bind="Model.GlobalProblemDescription"></textarea>
@@ -106,17 +111,21 @@
                         <div class="screen4-detail screen4-detail--problem-global">
                             <span class="screen4-detail-label">NOTE PRODUZIONE O BLOCCHI</span>
                             <div class="screen4-global-problem-box">
-                                <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" @onclick="OpenProblemModal">Inserisci nota Produzione o blocco</button>
-                                <div class="screen4-problem-summary screen4-problem-summary--global@(ProblemNotes.Count > 0 ? " has-problem" : string.Empty)">
-                                    <span>@GetProblemSummary()</span>
+                                <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" data-open-global-problem="true" @onclick="OpenProblemModal">Inserisci nota Produzione o blocco</button>
+                                <div class="screen4-problem-summary screen4-problem-summary--global@(ProblemNotes.Count > 0 ? " has-problem" : string.Empty)" data-global-problem-summary="true">
+                                    <span data-global-problem-summary-text="true">@GetProblemSummary()</span>
                                     @if (ProblemNotes.Count > 0)
                                     {
-                                        <button type="button" class="screen4-summary-clear" title="Rimuovi note" @onclick="ClearProblemNotesAsync">×</button>
+                                        <button type="button" class="screen4-summary-clear" data-clear-global-problem="true" aria-label="Rimuovi nota produzione o blocco" title="Rimuovi nota produzione o blocco" @onclick="ClearProblemNotesAsync">×</button>
                                     }
                                 </div>
+                                <input type="hidden" value="@Model.GlobalProblemDescription" data-global-problem-description-hidden="true" />
+                                <input type="hidden" value="@Model.GlobalProblemHours" data-global-problem-hours-hidden="true" />
+                                <input type="hidden" value="@Model.GlobalProblemMinutes" data-global-problem-minutes-hidden="true" />
+                                <input type="hidden" value="@JsonSerializer.Serialize(ProblemNotes)" data-problem-notes-hidden="true" />
                                 @if (ProblemNotes.Count > 1)
                                 {
-                                    <div class="screen4-problem-list">
+                                    <div class="screen4-problem-list" data-problem-notes-list="true">
                                         @for (var index = 0; index < ProblemNotes.Count; index++)
                                         {
                                             var note = ProblemNotes[index];
@@ -150,35 +159,56 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var launch in Model.SelectedLaunches)
+                                    @for (var index = 0; index < Model.SelectedLaunches.Count; index++)
                                     {
-                                        <tr class="screen4-table-row" data-screen4-slot="true">
+                                        var launch = Model.SelectedLaunches[index];
+                                        var historyRowId = $"screen4History{index}";
+                                        var materialLotsJson = JsonSerializer.Serialize(launch.AvailableMaterialLots ?? []);
+                                        var materialLotsBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(materialLotsJson));
+                                        <tr class="screen4-table-row"
+                                            data-screen4-slot="true"
+                                            data-order-id="@launch.OrderId"
+                                            data-slot-index="@index"
+                                            data-max-qty="@FormatQuantityInvariant(launch.QuantityToProduce ?? 0m)"
+                                            data-produced-qty="@FormatQuantityInvariant(launch.QuantityProduced ?? 0m)"
+                                            data-remaining-qty="@FormatQuantityInvariant(GetRemainingQuantity(launch))"
+                                            data-lot-code="@launch.LotCode"
+                                            data-article-code="@launch.ArticleCode"
+                                            data-article-description="@launch.ArticleDescription"
+                                            data-material-lots-base64="@materialLotsBase64"
+                                            data-material-lot-error="@launch.MaterialLotValidationMessage">
                                             <td data-label="Lotto"
                                                 class="@GetLotCellClass(launch)"
+                                                data-edit-material-lot-cell="@(Model.RequiresMaterialLotSelection ? "true" : null)"
                                                 tabindex="@(Model.RequiresMaterialLotSelection ? "0" : null)"
                                                 role="@(Model.RequiresMaterialLotSelection ? "button" : null)"
                                                 aria-label="@(Model.RequiresMaterialLotSelection ? "Apri selezione lotto per questa riga" : null)"
                                                 @onclick="() => OpenMaterialLotModalAsync(launch)">
                                                 <div class="screen4-table-lot">@launch.LotCode</div>
-                                                @if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
-                                                {
-                                                    <button type="button"
-                                                            class="screen4-table-material-lot screen4-table-material-lot--editable"
-                                                            title="Modifica il lotto selezionato"
-                                                            aria-label="Modifica il lotto selezionato">
-                                                        @launch.SelectedMaterialLotCode
-                                                    </button>
-                                                }
+                                                <button type="button"
+                                                        class="screen4-table-material-lot screen4-table-material-lot--editable@(string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) ? " is-hidden" : string.Empty)"
+                                                        data-material-lot-display="true"
+                                                        data-edit-material-lot-trigger="true"
+                                                        title="Modifica il lotto selezionato"
+                                                        aria-label="Modifica il lotto selezionato">
+                                                    @launch.SelectedMaterialLotCode
+                                                </button>
                                             </td>
                                             <td data-label="Numero Documento"><div class="screen4-table-doc">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? launch.DocumentNumber : "-")</div></td>
                                             <td data-label="Fase"><div class="screen4-table-phase">&nbsp;</div></td>
-                                            <td data-label="Qta da produrre"><div class="screen4-table-number">@(launch.QuantityToProduce.HasValue ? FormatQuantity(launch.QuantityToProduce.Value) : "-")</div></td>
+                                            <td data-label="Qta da produrre"><div class="screen4-table-number" data-max-value="true">@(launch.QuantityToProduce.HasValue ? FormatQuantity(launch.QuantityToProduce.Value) : "-")</div></td>
                                             <td data-label="Qta prodotta"><strong class="screen4-table-number screen4-table-number--produced-readonly">@FormatQuantity(launch.QuantityProduced ?? 0m)</strong></td>
-                                            <td data-label="Qta dichiarata"><strong class="screen4-table-number screen4-table-number--declared">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong></td>
+                                            <td data-label="Qta dichiarata">
+                                                <strong class="screen4-table-number screen4-table-number--declared" data-declared-value="true">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong>
+                                                <input type="hidden" value="@launch.OrderId" />
+                                                <input type="hidden" value="@(launch.QuantityDeclared.HasValue ? FormatQuantityInvariant(launch.QuantityDeclared.Value) : string.Empty)" data-declared-hidden="true" />
+                                                <input type="hidden" value="@launch.SelectedMaterialLotCode" data-material-lot-hidden="true" />
+                                            </td>
                                             <td data-label="Azioni">
                                                 <div class="screen4-slot-actions screen4-slot-actions--table">
                                                     <button type="button"
                                                             class="screen4-slot-button screen4-slot-button--max"
+                                                            data-set-max="true"
                                                             title="@(GetRemainingQuantity(launch) <= 0m ? "Quantità già completata" : "Imposta la qta massima residua")"
                                                             disabled="@(GetRemainingQuantity(launch) <= 0m)"
                                                             @onclick="() => SetMaxQuantityAsync(launch)">Max</button>
@@ -186,6 +216,7 @@
                                                     {
                                                         <button type="button"
                                                                 class="screen4-slot-button screen4-slot-button--history"
+                                                                data-edit-material-lot="true"
                                                                 title="Seleziona o modifica il lotto"
                                                                 @onclick="() => OpenMaterialLotModalAsync(launch)">Lotto</button>
                                                     }
@@ -193,18 +224,25 @@
                                                     {
                                                         <button type="button"
                                                                 class="screen4-slot-button screen4-slot-button--partial"
+                                                                data-set-partial="true"
                                                                 title="@(GetRemainingQuantity(launch) <= 0m ? "Quantità già completata" : "Inserisci una qta parziale residua")"
                                                                 disabled="@(GetRemainingQuantity(launch) <= 0m)"
                                                                 @onclick="() => OpenQuantityModal(launch)">Qta Parziale</button>
                                                     }
                                                     @if (launch.HasPreviousDeclarations)
                                                     {
-                                                        <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => ToggleHistory(launch.OrderId)">
+                                                        <button type="button"
+                                                                class="screen4-slot-button screen4-slot-button--history"
+                                                                data-toggle-history="true"
+                                                                data-history-target="@historyRowId"
+                                                                aria-expanded="@(ExpandedHistoryOrderIds.Contains(launch.OrderId) ? "true" : "false")"
+                                                                @onclick="() => ToggleHistory(launch.OrderId)">
                                                             @(ExpandedHistoryOrderIds.Contains(launch.OrderId) ? "Nascondi precedenti" : "Mostra precedenti")
                                                         </button>
                                                     }
                                                     <button type="button"
                                                             class="screen4-slot-clear screen4-slot-clear--table@(launch.QuantityDeclared.HasValue ? string.Empty : " is-hidden")"
+                                                            data-clear-slot="true"
                                                             aria-label="Annulla dati riga"
                                                             title="Annulla dati riga"
                                                             @onclick="() => ClearSlotAsync(launch)">
@@ -215,7 +253,7 @@
                                         </tr>
                                         @if (launch.HasPreviousDeclarations && ExpandedHistoryOrderIds.Contains(launch.OrderId))
                                         {
-                                            <tr class="screen4-history-row">
+                                            <tr class="screen4-history-row" id="@historyRowId" data-history-row="true">
                                                 <td colspan="7">
                                                     <div class="screen4-history-wrap">
                                                         <div class="screen4-history-title">Dichiarazioni precedenti</div>
@@ -1370,6 +1408,11 @@
     private static string FormatQuantity(decimal value)
     {
         return value.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
+    }
+
+    private static string FormatQuantityInvariant(decimal value)
+    {
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
     private static decimal? ParseQuantity(string? rawValue)
