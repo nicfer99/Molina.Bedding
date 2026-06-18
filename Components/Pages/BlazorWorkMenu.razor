@@ -81,25 +81,22 @@
     }
 </section>
 
-@if (ShowTrapunteModeModal)
-{
-    <div class="screen4-qty-modal" id="trapunteProductionModeModal">
-        <div class="screen4-qty-modal__backdrop" data-close-production-mode-modal="true" @onclick="CloseTrapunteModeModal"></div>
-        <div class="screen4-qty-modal__dialog workmenu-mode-modal" role="dialog" aria-modal="true" aria-labelledby="trapunteProductionModeTitle">
-            <div class="screen4-qty-modal__header">
-                <div>
-                    <div class="page-kicker">Linea Trapunte</div>
-                    <h2 id="trapunteProductionModeTitle">Scegli la modalità</h2>
-                </div>
-                <button type="button" class="screen4-qty-modal__close" data-close-production-mode-modal="true" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">×</button>
+<div class="screen4-qty-modal" id="trapunteProductionModeModal" hidden="@(!ShowTrapunteModeModal)">
+    <div class="screen4-qty-modal__backdrop" data-close-production-mode-modal="true" @onclick="CloseTrapunteModeModal"></div>
+    <div class="screen4-qty-modal__dialog workmenu-mode-modal" role="dialog" aria-modal="true" aria-labelledby="trapunteProductionModeTitle">
+        <div class="screen4-qty-modal__header">
+            <div>
+                <div class="page-kicker">Linea Trapunte</div>
+                <h2 id="trapunteProductionModeTitle">Scegli la modalità</h2>
             </div>
-            <div class="workmenu-mode-modal__content">
-                <button type="button" class="workmenu-mode-choice" data-production-mode-choice="riempimento" @onclick="ContinueTrapunteRiempimentoAsync">Riempimento</button>
-                <button type="button" class="workmenu-mode-choice" data-production-mode-choice="macchina" @onclick="ContinueTrapunteMacchinaAsync">Macchina</button>
-            </div>
+            <button type="button" class="screen4-qty-modal__close" data-close-production-mode-modal="true" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">×</button>
+        </div>
+        <div class="workmenu-mode-modal__content">
+            <button type="button" class="workmenu-mode-choice" data-production-mode-choice="riempimento" @onclick="ContinueTrapunteRiempimentoAsync">Riempimento</button>
+            <button type="button" class="workmenu-mode-choice" data-production-mode-choice="macchina" @onclick="ContinueTrapunteMacchinaAsync">Macchina</button>
         </div>
     </div>
-}
+</div>
 
 @code {
     private WorkMenuViewModel? Model { get; set; }

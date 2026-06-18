@@ -341,9 +341,7 @@
     }
 </section>
 
-@if (ShowDatePinModal)
-{
-    <div class="screen4-qty-modal" id="screen4DatePinModal">
+<div class="screen4-qty-modal" id="screen4DatePinModal" hidden="@(!ShowDatePinModal)">
         <div class="screen4-qty-modal__backdrop" data-close-date-pin-modal="true" @onclick="CloseDatePinModal"></div>
         <div class="screen4-qty-modal__dialog screen4-date-pin-modal" role="dialog" aria-modal="true" aria-labelledby="screen4DatePinModalTitle">
             <div class="screen4-qty-modal__header">
@@ -387,11 +385,10 @@
             </div>
         </div>
     </div>
-}
 
-@if (ActiveQuantityLaunch is not null)
+@if (Model is not null)
 {
-    <div class="screen4-qty-modal" id="screen4QuantityModal">
+    <div class="screen4-qty-modal" id="screen4QuantityModal" hidden="@(ActiveQuantityLaunch is null)">
         <div class="screen4-qty-modal__backdrop" data-close-qty-modal="true" @onclick="CloseQuantityModal"></div>
         <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4QuantityModalTitle">
             <div class="screen4-qty-modal__header">
@@ -406,7 +403,7 @@
                 <div class="screen4-qty-modal__info">
                     <div class="screen4-qty-modal__info-box">
                         <span class="note-label" id="screen4QtyModalReferenceLabel">Qta residua</span>
-                        <strong id="screen4QtyModalMax">@FormatQuantity(GetRemainingQuantity(ActiveQuantityLaunch))</strong>
+                        <strong id="screen4QtyModalMax">@(ActiveQuantityLaunch is null ? "0" : FormatQuantity(GetRemainingQuantity(ActiveQuantityLaunch)))</strong>
                     </div>
                     <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
                         <span class="note-label">Qta dichiarata</span>
@@ -435,11 +432,8 @@
             </div>
         </div>
     </div>
-}
 
-@if (ActiveMaterialLotLaunch is not null)
-{
-    <div class="screen4-qty-modal" id="screen4MaterialLotModal">
+    <div class="screen4-qty-modal" id="screen4MaterialLotModal" hidden="@(ActiveMaterialLotLaunch is null)">
         <div class="screen4-qty-modal__backdrop" data-close-material-lot-modal="true" @onclick="CloseMaterialLotModal"></div>
         <div class="screen4-qty-modal__dialog screen4-material-lot-modal" role="dialog" aria-modal="true" aria-labelledby="screen4MaterialLotModalTitle">
             <div class="screen4-qty-modal__header">
@@ -447,8 +441,8 @@
                     <div class="page-kicker">Lotto</div>
                     <h2 id="screen4MaterialLotModalTitle">Inserisci il lotto</h2>
                     <div class="material-lot-article-summary" data-material-lot-article-summary="true">
-                        <span data-material-lot-article-code="true">@ActiveMaterialLotLaunch.ArticleCode</span>
-                        <strong data-material-lot-article-description="true">@ActiveMaterialLotLaunch.ArticleDescription</strong>
+                        <span data-material-lot-article-code="true">@(ActiveMaterialLotLaunch?.ArticleCode ?? string.Empty)</span>
+                        <strong data-material-lot-article-description="true">@(ActiveMaterialLotLaunch?.ArticleDescription ?? string.Empty)</strong>
                     </div>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" data-close-material-lot-modal="true" @onclick="CloseMaterialLotModal" aria-label="Chiudi finestra">×</button>
@@ -457,7 +451,7 @@
                 <input type="hidden" id="screen4MaterialLotInput" value="@MaterialLotChoice" />
                 <div class="@GetMaterialLotHelpClass()" id="screen4MaterialLotHelp">@GetMaterialLotHelpText()</div>
                 <div class="material-lot-reference-list" data-material-lot-list="true" aria-label="Lotti disponibili">
-                    @foreach (var materialLot in ActiveMaterialLotLaunch.AvailableMaterialLots)
+                    @foreach (var materialLot in ActiveMaterialLotLaunch?.AvailableMaterialLots ?? System.Linq.Enumerable.Empty<string>())
                     {
                         <button type="button"
                                 class="material-lot-reference-chip@(string.Equals(MaterialLotChoice, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
@@ -478,11 +472,8 @@
             </div>
         </div>
     </div>
-}
 
-@if (ShowTimingModal && Model is not null)
-{
-    <div class="screen4-time-modal" id="screen4TimingModal">
+    <div class="screen4-time-modal" id="screen4TimingModal" hidden="@(!ShowTimingModal)">
         <div class="screen4-qty-modal__backdrop" data-close-timing-modal="true" @onclick="CloseTimingModal"></div>
         <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4TimingModalTitle">
             <div class="screen4-qty-modal__header">
@@ -527,11 +518,8 @@
             </div>
         </div>
     </div>
-}
 
-@if (ShowProblemModal && Model is not null)
-{
-    <div class="screen4-time-modal" id="screen4ProblemModal">
+    <div class="screen4-time-modal" id="screen4ProblemModal" hidden="@(!ShowProblemModal)">
         <div class="screen4-qty-modal__backdrop" data-close-problem-modal="true" @onclick="CloseProblemModal"></div>
         <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="screen4ProblemModalTitle">
             <div class="screen4-qty-modal__header">

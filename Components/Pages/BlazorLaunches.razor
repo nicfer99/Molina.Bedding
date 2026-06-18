@@ -149,16 +149,14 @@
     }
 </section>
 
-@if (ActiveDirectLaunch is not null)
-{
-    <div class="screen4-qty-modal" id="launchDirectInsertModal">
+<div class="screen4-qty-modal" id="launchDirectInsertModal" hidden="@(ActiveDirectLaunch is null)">
         <div class="screen4-qty-modal__backdrop" data-close-launch-direct-modal="true" @onclick="CloseDirectModal"></div>
         <div class="screen4-qty-modal__dialog launch-direct-modal" role="dialog" aria-modal="true" aria-labelledby="launchDirectInsertModalTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Schermata 3</div>
                     <h2 id="launchDirectInsertModalTitle">Dati da riportare in Schermata 4</h2>
-                    <div class="screen4-modal-lot" data-launch-direct-lot="true">@ActiveDirectLaunch.LotCode</div>
+                    <div class="screen4-modal-lot" data-launch-direct-lot="true">@(ActiveDirectLaunch?.LotCode ?? string.Empty)</div>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" data-close-launch-direct-modal="true" @onclick="CloseDirectModal" aria-label="Chiudi finestra">×</button>
             </div>
@@ -177,7 +175,7 @@
                         <div class="screen4-qty-modal__info">
                             <div class="screen4-qty-modal__info-box">
                                 <span class="note-label">Qta residua</span>
-                                <strong data-launch-direct-max="true">@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
+                                <strong data-launch-direct-max="true">@(ActiveDirectLaunch is null ? "0" : FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch)))</strong>
                             </div>
                             <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
                                 <span class="note-label">Qta impostata</span>
@@ -209,7 +207,7 @@
                                     @GetDirectMaterialLotHelpText()
                                 </div>
                                 <div class="material-lot-reference-list" data-launch-direct-material-lot-list="true" aria-label="Lotti disponibili">
-                                    @foreach (var materialLot in ActiveDirectLaunch.AvailableMaterialLots)
+                                    @foreach (var materialLot in ActiveDirectLaunch?.AvailableMaterialLots ?? System.Linq.Enumerable.Empty<string>())
                                     {
                                         <button type="button"
                                                 class="material-lot-reference-chip@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
@@ -234,11 +232,8 @@
             </div>
         </div>
     </div>
-}
 
-@if (ShowDirectPartialModal && ActiveDirectLaunch is not null)
-{
-    <div class="screen4-qty-modal" id="launchDirectPartialQuantityModal">
+<div class="screen4-qty-modal" id="launchDirectPartialQuantityModal" hidden="@(!(ShowDirectPartialModal && ActiveDirectLaunch is not null))">
         <div class="screen4-qty-modal__backdrop" data-close-launch-direct-partial-modal="true" @onclick="CloseDirectPartialModal"></div>
         <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="launchDirectPartialQuantityModalTitle">
             <div class="screen4-qty-modal__header">
@@ -254,7 +249,7 @@
                 <div class="screen4-qty-modal__info">
                     <div class="screen4-qty-modal__info-box">
                         <span class="note-label" id="launchDirectPartialQtyModalReferenceLabel">Qta residua</span>
-                        <strong id="launchDirectPartialQtyModalMax">@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
+                        <strong id="launchDirectPartialQtyModalMax">@(ActiveDirectLaunch is null ? "0" : FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch)))</strong>
                     </div>
                     <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
                         <span class="note-label">Qta dichiarata</span>
@@ -285,7 +280,6 @@
             </div>
         </div>
     </div>
-}
 
 @code {
     [Parameter] public string ActionId { get; set; } = string.Empty;
