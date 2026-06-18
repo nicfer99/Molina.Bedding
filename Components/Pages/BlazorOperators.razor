@@ -35,6 +35,8 @@
                     var isSelected = SelectedIds.Contains(operatorItem.Id);
                     <button type="button"
                             class="operator-card operator-card--large@(isSelected ? " is-selected" : string.Empty)"
+                            data-operator-id="@operatorItem.Id"
+                            data-operator-name="@operatorItem.Name"
                             aria-pressed="@(isSelected ? "true" : "false")"
                             @onclick="() => ToggleOperator(operatorItem.Id)">
                         <span class="operator-card-icon dx-icon-user"></span>

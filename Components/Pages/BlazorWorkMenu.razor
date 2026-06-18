@@ -49,6 +49,7 @@
                                 continue;
                             }
 
+                            var requiresProductionModeChoice = RequiresTrapunteProductionModeChoice(action);
                             <div class="action-slot action-slot--large">
                                 <button type="button"
                                         class="dx-action-button dx-action-button--large dx-action-button--@action.Tone"
@@ -56,6 +57,11 @@
                                         data-action-text="@action.Text"
                                         data-action-icon="@action.Icon"
                                         data-action-tone="@action.Tone"
+                                        data-target-url="@GetActionTargetUrl(action)"
+                                        data-pending-message=""
+                                        data-requires-production-mode="@(requiresProductionModeChoice ? "true" : "false")"
+                                        data-machine-url="@(requiresProductionModeChoice ? GetTrapunteModeUrl("macchina") : string.Empty)"
+                                        data-filling-url="@(requiresProductionModeChoice ? GetTrapunteModeUrl("riempimento") : string.Empty)"
                                         @onclick="() => OpenActionAsync(action)">
                                     <span class="dx-button-content">
                                         <span class="@GetActionIconClass(action.Icon)" aria-hidden="true"></span>
@@ -78,18 +84,18 @@
 @if (ShowTrapunteModeModal)
 {
     <div class="screen4-qty-modal" id="trapunteProductionModeModal">
-        <div class="screen4-qty-modal__backdrop" @onclick="CloseTrapunteModeModal"></div>
+        <div class="screen4-qty-modal__backdrop" data-close-production-mode-modal="true" @onclick="CloseTrapunteModeModal"></div>
         <div class="screen4-qty-modal__dialog workmenu-mode-modal" role="dialog" aria-modal="true" aria-labelledby="trapunteProductionModeTitle">
             <div class="screen4-qty-modal__header">
                 <div>
                     <div class="page-kicker">Linea Trapunte</div>
                     <h2 id="trapunteProductionModeTitle">Scegli la modalità</h2>
                 </div>
-                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">×</button>
+                <button type="button" class="screen4-qty-modal__close" data-close-production-mode-modal="true" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">×</button>
             </div>
             <div class="workmenu-mode-modal__content">
-                <button type="button" class="workmenu-mode-choice" @onclick="ContinueTrapunteRiempimentoAsync">Riempimento</button>
-                <button type="button" class="workmenu-mode-choice" @onclick="ContinueTrapunteMacchinaAsync">Macchina</button>
+                <button type="button" class="workmenu-mode-choice" data-production-mode-choice="riempimento" @onclick="ContinueTrapunteRiempimentoAsync">Riempimento</button>
+                <button type="button" class="workmenu-mode-choice" data-production-mode-choice="macchina" @onclick="ContinueTrapunteMacchinaAsync">Macchina</button>
             </div>
         </div>
     </div>
@@ -179,6 +185,34 @@
     private ValueTask SyncModalStateAsync()
     {
         return JsRuntime.InvokeVoidAsync("molinaBlazorModal.setOpen", ShowTrapunteModeModal);
+    }
+
+    private bool RequiresTrapunteProductionModeChoice(WorkAreaActionViewModel action)
+    {
+        return string.Equals(action.Id, "trapunte-dichiarazione-produzione", StringComparison.Ordinal);
+    }
+
+    private string GetActionTargetUrl(WorkAreaActionViewModel action)
+    {
+        if (RequiresTrapunteProductionModeChoice(action))
+        {
+            return string.Empty;
+        }
+
+        if (!FlowService.TryGetWorkAction(action.Id, out var definition))
+        {
+            return string.Empty;
+        }
+
+        return FlowService.IsProductionLaunchAction(definition)
+            ? $"/blazor/launches/{Uri.EscapeDataString(action.Id)}"
+            : $"/blazor/screen4/{Uri.EscapeDataString(action.Id)}";
+    }
+
+    private static string GetTrapunteModeUrl(string productionMode)
+    {
+        const string actionId = "trapunte-dichiarazione-produzione";
+        return $"/blazor/launches/{actionId}?productionMode={Uri.EscapeDataString(productionMode)}";
     }
 
     private static string GetActionIconClass(string? icon)
