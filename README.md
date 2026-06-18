@@ -2,7 +2,7 @@
 
 Progetto ASP.NET Core 8 per il flusso **Dichiarazione produzione**.
 
-Il flusso principale e ora Blazor Interactive Server. La parte MVC esistente resta disponibile come legacy/fallback.
+Il flusso principale è ora Blazor Interactive Server. La parte MVC esistente resta disponibile come legacy/fallback.
 
 ## Route applicative
 
@@ -43,7 +43,7 @@ Origine lotti:
 - vista `dbo.X_OE_VW_PROD_LANCIO`
 - materiali da `dbo.X_OE_VW_PROD_LANCIO_MP`
 - lotti materiale da `dbo.X_OE_VW_LOTTI`
-- se vengono trovate piu righe MP bedding riempimento, il flusso resta bloccato con messaggio di errore
+- se vengono trovate più righe MP bedding riempimento, il flusso resta bloccato con messaggio di errore
 
 Inserimento dichiarazioni:
 
@@ -56,7 +56,7 @@ Inserimento dichiarazioni:
 - il timing salvato su database viene moltiplicato per il numero di operatori selezionati
 - la `qta_dichiarata` resta separata dalla `qta_prodotta`
 - per Trapunte viene valorizzato `cod_fase`: `05` in Riempimento, `10` in Macchina
-- se esistono dichiarazioni precedenti sul lotto selezionato, e disponibile lo storico
+- se esistono dichiarazioni precedenti sul lotto selezionato, è disponibile lo storico
 - il salvataggio avviene tramite il pulsante **Inserisci**
 
 ## Migrazione Blazor
@@ -64,7 +64,16 @@ Inserimento dichiarazioni:
 - Blazor e MVC condividono `DataAccess`, `Models`, `Services`, query SQL e `wwwroot/css/site.css`.
 - Lo stato del flusso Blazor viene mantenuto da `BlazorProductionDeclarationState` e salvato in `localStorage`.
 - `ProductionDeclarationFlowService` replica l'orchestrazione del controller MVC per operatori, lavorazioni, lotti, barcode, timing, note, `cod_fase`, storico e salvataggio.
-- JavaScript dedicato a Blazor limitato a storage, focus barcode e dialog base: `wwwroot/js/blazor-production-declaration.js`.
+- JavaScript dedicato a Blazor limitato a storage locale, focus/scanner barcode, blocco scroll modali e dialog/toast custom: `wwwroot/js/blazor-production-declaration.js`.
+- Le differenze visuali residue vanno corrette in Blazor, mantenendo MVC come riferimento legacy.
+
+## Parità MVC/Blazor da verificare
+
+- `/` deve aprire Blazor, non MVC.
+- `/mvc/ProductionDeclaration/Start` e `/ProductionDeclaration/Start` devono restare disponibili per confronto legacy.
+- La schermata iniziale Blazor deve essere pixel-equivalente a MVC su desktop e tablet.
+- Operatori, lavorazioni, lotti, inserimento diretto, Schermata 4, PIN data, timing, note/blocchi, storico e reset devono seguire lo stesso comportamento MVC.
+- Barcode/scanner deve mantenere il focus e accettare input anche dopo tocchi fuori dal campo, come nel flusso MVC.
 
 ## Script database aggiunti
 
@@ -83,4 +92,4 @@ dotnet build
 dotnet test
 ```
 
-Se il database non e raggiungibile, non sostituire la logica SQL: verificare build e UI, poi completare il test funzionale in ambiente con SQL Server `U_MOLINA`.
+Se il database non è raggiungibile, non sostituire la logica SQL: verificare build, route e UI, poi completare il test funzionale in ambiente con SQL Server `U_MOLINA`.
