@@ -1,0 +1,1106 @@
+@page "/blazor/screen4"
+@page "/blazor/screen4/{ActionId}"
+@inject NavigationManager Navigation
+@inject BlazorProductionDeclarationState FlowState
+@inject IProductionDeclarationFlowService FlowService
+@inject IJSRuntime JsRuntime
+
+<section class="page-section page-section--wide page-section--screen4"
+         data-screen4-page="true"
+         data-timing-only-mode="@(Model?.IsTimingOnlyMode.ToString().ToLowerInvariant() ?? "false")"
+         data-requires-material-lot-selection="@(Model?.RequiresMaterialLotSelection.ToString().ToLowerInvariant() ?? "false")">
+    <header class="page-header page-header--compact">
+        <div>
+            <div class="page-kicker">Schermata 4</div>
+            <h1>@(Model?.ActionText ?? "Operazione")</h1>
+            <p class="page-intro">@GetLineDisplayTitle()</p>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+    {
+        <div class="inline-alert inline-alert--success" role="status">@SuccessMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ValidationMessage))
+    {
+        <div class="inline-alert" role="alert">@ValidationMessage</div>
+    }
+
+    @if (Model is null)
+    {
+        <div class="inline-alert">Caricamento operazione...</div>
+    }
+    else
+    {
+        <div id="screen4InsertForm">
+            <div class="screen4-card screen4-card--table-layout">
+                <div class="screen4-summary-bar screen4-summary-bar--screen4">
+                    <div class="screen4-block screen4-block--summary">
+                        <span class="note-label">Operatori selezionati</span>
+                        <div class="selected-operators-list">
+                            @foreach (var operatorItem in Model.SelectedOperators)
+                            {
+                                <span class="selected-operator-chip">@operatorItem.Name</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="screen4-detail screen4-detail--date-global">
+                        <span class="screen4-detail-label">Data</span>
+                        <div class="screen4-date-box">
+                            <input type="date"
+                                   value="@Model.DeclarationDate.ToString("yyyy-MM-dd")"
+                                   class="screen4-date-input"
+                                   disabled="@(!Model.IsDeclarationDateEditable)"
+                                   @onchange="OnDeclarationDateChanged" />
+                            @if (Model.CanRequestDateEdit)
+                            {
+                                <button type="button" class="screen4-inline-button screen4-inline-button--secondary" @onclick="OpenDatePinModal">
+                                    @(Model.IsDeclarationDateEditable ? "Data sbloccata" : "Modifica data")
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!Model.IsTimingOnlyMode)
+                    {
+                        <div class="screen4-detail screen4-detail--total-produced-global">
+                            <span class="screen4-detail-label">Qta dichiarata</span>
+                            <div class="screen4-total-produced-box">
+                                <strong>@FormatQuantity(Model.TotalDeclared)</strong>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="screen4-detail screen4-detail--timing-global">
+                        <span class="screen4-detail-label">Timing totale</span>
+                        <div class="screen4-global-timing-box">
+                            <button type="button" class="screen4-inline-button screen4-inline-button--stacked" @onclick="OpenTimingModal">Timing</button>
+                            <div class="screen4-time-display screen4-time-display--global">
+                                <span>@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</span>
+                                @if (Model.GlobalTimingHours > 0 || Model.GlobalTimingMinutes > 0)
+                                {
+                                    <button type="button" class="screen4-summary-clear" title="Annulla timing" @onclick="ClearTiming">x</button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (IsGenericDeclaration && SelectedNoteRequiresAnnotation)
+                    {
+                        <div class="screen4-detail screen4-detail--problem-global screen4-detail--note-description">
+                            <span class="screen4-detail-label">Annotazione</span>
+                            <div class="screen4-global-problem-box">
+                                <textarea class="screen4-problem-textarea"
+                                          rows="6"
+                                          placeholder="Inserisci il testo annotazione"
+                                          @bind="Model.GlobalProblemDescription"></textarea>
+                            </div>
+                        </div>
+                    }
+
+                    @if (!Model.IsTimingOnlyMode)
+                    {
+                        <div class="screen4-detail screen4-detail--problem-global">
+                            <span class="screen4-detail-label">NOTE PRODUZIONE O BLOCCHI</span>
+                            <div class="screen4-global-problem-box">
+                                <button type="button" class="screen4-inline-button screen4-inline-button--warning screen4-inline-button--stacked" @onclick="OpenProblemModal">Inserisci nota Produzione o blocco</button>
+                                <div class="screen4-problem-summary screen4-problem-summary--global@(ProblemNotes.Count > 0 ? " has-problem" : string.Empty)">
+                                    <span>@GetProblemSummary()</span>
+                                    @if (ProblemNotes.Count > 0)
+                                    {
+                                        <button type="button" class="screen4-summary-clear" title="Rimuovi note" @onclick="ClearProblemNotes">x</button>
+                                    }
+                                </div>
+                                @if (ProblemNotes.Count > 1)
+                                {
+                                    <div class="screen4-problem-list">
+                                        @for (var index = 0; index < ProblemNotes.Count; index++)
+                                        {
+                                            var note = ProblemNotes[index];
+                                            <div class="screen4-problem-list-item">
+                                                <span>@FormatProblemNote(note)</span>
+                                                <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNote(index)">x</button>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (Model.SelectedLaunches.Count > 0)
+                {
+                    <div class="screen4-block screen4-block--table">
+                        <span class="note-label">Lotti selezionati</span>
+                        <div class="screen4-table-wrap">
+                            <table class="screen4-table screen4-table--wide">
+                                <thead>
+                                    <tr>
+                                        <th>Lotto</th>
+                                        <th>Numero Documento</th>
+                                        <th>Fase</th>
+                                        <th>Qta da produrre</th>
+                                        <th>Qta prodotta</th>
+                                        <th>Qta dichiarata</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var launch in Model.SelectedLaunches)
+                                    {
+                                        <tr class="screen4-table-row" data-screen4-slot="true">
+                                            <td data-label="Lotto" class="@GetLotCellClass(launch)" @onclick="() => OpenMaterialLotModal(launch)">
+                                                <div class="screen4-table-lot">@launch.LotCode</div>
+                                                @if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
+                                                {
+                                                    <button type="button" class="screen4-table-material-lot screen4-table-material-lot--editable">
+                                                        @launch.SelectedMaterialLotCode
+                                                    </button>
+                                                }
+                                            </td>
+                                            <td data-label="Numero Documento"><div class="screen4-table-doc">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? launch.DocumentNumber : "-")</div></td>
+                                            <td data-label="Fase"><div class="screen4-table-phase">&nbsp;</div></td>
+                                            <td data-label="Qta da produrre"><div class="screen4-table-number">@FormatQuantity(launch.QuantityToProduce ?? 0m)</div></td>
+                                            <td data-label="Qta prodotta"><strong class="screen4-table-number screen4-table-number--produced-readonly">@FormatQuantity(launch.QuantityProduced ?? 0m)</strong></td>
+                                            <td data-label="Qta dichiarata"><strong class="screen4-table-number screen4-table-number--declared">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong></td>
+                                            <td data-label="Azioni">
+                                                <div class="screen4-slot-actions screen4-slot-actions--table">
+                                                    <button type="button" class="screen4-slot-button screen4-slot-button--max" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => SetMaxQuantity(launch)">Max</button>
+                                                    @if (Model.RequiresMaterialLotSelection)
+                                                    {
+                                                        <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => OpenMaterialLotModal(launch)">Lotto</button>
+                                                    }
+                                                    @if ((launch.QuantityToProduce ?? 0m) != 1m)
+                                                    {
+                                                        <button type="button" class="screen4-slot-button screen4-slot-button--partial" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => OpenQuantityModal(launch)">Qta Parziale</button>
+                                                    }
+                                                    @if (launch.HasPreviousDeclarations)
+                                                    {
+                                                        <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => ToggleHistory(launch.OrderId)">
+                                                            @(ExpandedHistoryOrderIds.Contains(launch.OrderId) ? "Nascondi precedenti" : "Mostra precedenti")
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        @if (launch.HasPreviousDeclarations && ExpandedHistoryOrderIds.Contains(launch.OrderId))
+                                        {
+                                            <tr class="screen4-history-row">
+                                                <td colspan="7">
+                                                    <div class="screen4-history-wrap">
+                                                        <div class="screen4-history-table-wrap">
+                                                            <table class="screen4-history-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Data</th>
+                                                                        <th>Dichiarazione</th>
+                                                                        <th>Qta</th>
+                                                                        <th>Timing</th>
+                                                                        <th>Operatori</th>
+                                                                        <th>Note</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    @foreach (var history in launch.PreviousDeclarations)
+                                                                    {
+                                                                        <tr>
+                                                                            <td>@history.DeclarationDateTime.ToString("dd/MM/yyyy HH:mm")</td>
+                                                                            <td>@history.DeclarationId</td>
+                                                                            <td>@FormatQuantity(history.DeclaredQuantity)</td>
+                                                                            <td>@history.WorkedMinutes min</td>
+                                                                            <td>@history.OperatorsSummary</td>
+                                                                            <td>@history.AnomalyDescription</td>
+                                                                        </tr>
+                                                                    }
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                @if (IsGenericDeclaration && Model.AvailableNoteTypes.Count > 0)
+                {
+                    <div class="screen4-block">
+                        <span class="note-label">Tipo nota</span>
+                        <div class="screen4-note-type-buttons" role="group">
+                            @foreach (var noteType in Model.AvailableNoteTypes)
+                            {
+                                var isSelected = Model.SelectedNoteTypeId == noteType.Id;
+                                <button type="button"
+                                        class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
+                                        aria-pressed="@(isSelected ? "true" : "false")"
+                                        @onclick="() => SelectGenericNoteType(noteType.Id)">
+                                    @noteType.Description
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="form-footer form-footer--split">
+                <button type="button" class="secondary-action-link" @onclick="GoBack">Indietro</button>
+                <button type="button" id="screen4InsertButton" class="primary-action-button" @onclick="InsertAsync">Inserisci</button>
+            </div>
+        </div>
+    }
+</section>
+
+@if (ShowDatePinModal)
+{
+    <div class="screen4-qty-modal" id="screen4DatePinModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseDatePinModal"></div>
+        <div class="screen4-qty-modal__dialog screen4-date-pin-modal" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Modifica data</div>
+                    <h2>Inserisci il PIN</h2>
+                    <p class="screen4-date-pin-modal__intro">Per sbloccare la data usa il PIN dell'operatore abilitato.</p>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDatePinModal">x</button>
+            </div>
+            <div class="screen4-qty-modal__content">
+                <label class="screen4-date-pin-modal__label" for="screen4DatePinInput">PIN operatore</label>
+                <input type="password" id="screen4DatePinInput" class="screen4-date-pin-modal__input" inputmode="numeric" @bind="DatePin" />
+                <div class="screen4-date-pin-modal__help">@DatePinMessage</div>
+            </div>
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseDatePinModal">Chiudi</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmDatePinAsync">Conferma PIN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ActiveQuantityLaunch is not null)
+{
+    <div class="screen4-qty-modal" id="screen4QuantityModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseQuantityModal"></div>
+        <div class="screen4-qty-modal__dialog" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Quantita parziale</div>
+                    <h2>Inserisci la quantita dichiarata</h2>
+                    <p class="screen4-qty-modal__intro">Inserisci la qta dichiarata per il lotto selezionato.</p>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseQuantityModal">x</button>
+            </div>
+            <div class="screen4-qty-modal__content">
+                <div class="screen4-qty-modal__info">
+                    <div class="screen4-qty-modal__info-box">
+                        <span class="note-label">Qta residua</span>
+                        <strong>@FormatQuantity(GetRemainingQuantity(ActiveQuantityLaunch))</strong>
+                    </div>
+                    <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
+                        <span class="note-label">Qta dichiarata</span>
+                        <strong>@(string.IsNullOrWhiteSpace(QuantityKeypadValue) ? "0" : QuantityKeypadValue)</strong>
+                    </div>
+                </div>
+                <div class="screen4-qty-keypad">
+                    @foreach (var key in QuantityKeys)
+                    {
+                        <button type="button" class="screen4-qty-key@(key is "C" or "Del" ? " screen4-qty-key--secondary" : string.Empty)" @onclick="() => PressQuantityKey(key)">@key</button>
+                    }
+                </div>
+            </div>
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearActiveQuantity">Annulla qta dichiarata</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseQuantityModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmQuantity">Conferma</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ActiveMaterialLotLaunch is not null)
+{
+    <div class="screen4-qty-modal" id="screen4MaterialLotModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseMaterialLotModal"></div>
+        <div class="screen4-qty-modal__dialog screen4-material-lot-modal" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Lotto</div>
+                    <h2>Inserisci il lotto</h2>
+                    <div class="material-lot-article-summary">
+                        <span>@ActiveMaterialLotLaunch.ArticleCode</span>
+                        <strong>@ActiveMaterialLotLaunch.ArticleDescription</strong>
+                    </div>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseMaterialLotModal">x</button>
+            </div>
+            <div class="screen4-qty-modal__content">
+                <div class="material-lot-scan-help">Seleziona il lotto toccando uno dei lotti disponibili.</div>
+                <div class="material-lot-reference-list" aria-label="Lotti disponibili">
+                    @foreach (var materialLot in ActiveMaterialLotLaunch.AvailableMaterialLots)
+                    {
+                        <button type="button"
+                                class="material-lot-reference-chip@(string.Equals(MaterialLotChoice, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
+                                @onclick="() => MaterialLotChoice = materialLot">
+                            @materialLot
+                        </button>
+                    }
+                </div>
+            </div>
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearMaterialLotChoice">Annulla lotto</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseMaterialLotModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmMaterialLot">Conferma</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowTimingModal && Model is not null)
+{
+    <div class="screen4-time-modal" id="screen4TimingModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseTimingModal"></div>
+        <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Timing totale</div>
+                    <h2>Inserisci il timing</h2>
+                    <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTimingModal">x</button>
+            </div>
+            <div class="screen4-time-display-panel">
+                <div class="screen4-time-display-main">@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</div>
+            </div>
+            <div class="screen4-time-grid">
+                <div class="screen4-time-section">
+                    <div class="screen4-time-section__label">Ore</div>
+                    <div class="screen4-time-hours-controls">
+                        <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(-1)">-1 ora</button>
+                        <div class="screen4-time-value-box">@Model.GlobalTimingHours</div>
+                        <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(1)">+1 ora</button>
+                    </div>
+                </div>
+                <div class="screen4-time-section">
+                    <div class="screen4-time-section__label">Minuti</div>
+                    <div class="screen4-minute-options screen4-minute-options--timing">
+                        @foreach (var minute in MinuteOptions)
+                        {
+                            <button type="button" class="screen4-minute-option@(Model.GlobalTimingMinutes == minute ? " is-active" : string.Empty)" @onclick="() => Model.GlobalTimingMinutes = minute">@minute.ToString("00")</button>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearTiming">Annulla timing</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseTimingModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="CloseTimingModal">Conferma</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (ShowProblemModal && Model is not null)
+{
+    <div class="screen4-time-modal" id="screen4ProblemModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseProblemModal"></div>
+        <div class="screen4-qty-modal__dialog screen4-time-modal__dialog" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Note produzione o blocchi</div>
+                    <h2>NOTE PRODUZIONE O BLOCCHI</h2>
+                    <div class="screen4-modal-lot">Valido per tutti i lotti selezionati</div>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseProblemModal">x</button>
+            </div>
+
+            <div class="screen4-problem-note-type">
+                <div class="screen4-problem-label">Tipo nota</div>
+                <div class="screen4-note-type-buttons" role="group">
+                    @foreach (var noteType in Model.AvailableNoteTypes)
+                    {
+                        var isSelected = ProblemNoteTypeId == noteType.Id;
+                        <button type="button"
+                                class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
+                                @onclick="() => ProblemNoteTypeId = noteType.Id">
+                            @noteType.Description
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @if (ProblemSelectedNoteRequiresAnnotation)
+            {
+                <div class="screen4-problem-editor">
+                    <label class="screen4-problem-label" for="screen4ProblemDescription">Descrizione blocco o anomalia</label>
+                    <textarea id="screen4ProblemDescription" class="screen4-problem-textarea" rows="4" placeholder="Scrivi il blocco o l'anomalia riscontrata" @bind="ProblemDescription"></textarea>
+                </div>
+            }
+
+            <div class="screen4-time-display-panel screen4-time-display-panel--problem">
+                <div class="screen4-time-display-main">@FormatTime(ProblemHours, ProblemMinutes)</div>
+            </div>
+            <div class="screen4-time-grid">
+                <div class="screen4-time-section">
+                    <div class="screen4-time-section__label">Ore</div>
+                    <div class="screen4-time-hours-controls">
+                        <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours = Math.Max(0, ProblemHours - 1)">-1 ora</button>
+                        <div class="screen4-time-value-box">@ProblemHours</div>
+                        <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours++">+1 ora</button>
+                    </div>
+                </div>
+                <div class="screen4-time-section">
+                    <div class="screen4-time-section__label">Minuti</div>
+                    <div class="screen4-minute-options screen4-minute-options--problem">
+                        @foreach (var minute in MinuteOptions)
+                        {
+                            <button type="button" class="screen4-minute-option@(ProblemMinutes == minute ? " is-active" : string.Empty)" @onclick="() => ProblemMinutes = minute">@minute.ToString("00")</button>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearProblemDraft">Annulla</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseProblemModal">Chiudi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmProblemNote">Aggiungi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string? ActionId { get; set; }
+
+    private static readonly string[] QuantityKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "Del", ","];
+    private static readonly int[] MinuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+    private Screen4ViewModel? Model { get; set; }
+    private string? ValidationMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private Screen4SelectedLaunchViewModel? ActiveQuantityLaunch { get; set; }
+    private string QuantityKeypadValue { get; set; } = string.Empty;
+    private Screen4SelectedLaunchViewModel? ActiveMaterialLotLaunch { get; set; }
+    private string MaterialLotChoice { get; set; } = string.Empty;
+    private bool ShowTimingModal { get; set; }
+    private bool ShowProblemModal { get; set; }
+    private bool ShowDatePinModal { get; set; }
+    private string DatePin { get; set; } = string.Empty;
+    private string DatePinMessage { get; set; } = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
+    private List<Screen4ProblemNotePostItemModel> ProblemNotes { get; } = [];
+    private int ProblemNoteTypeId { get; set; }
+    private string ProblemDescription { get; set; } = string.Empty;
+    private int ProblemHours { get; set; }
+    private int ProblemMinutes { get; set; }
+    private HashSet<int> ConfirmedOverLimitOrderIds { get; } = [];
+    private HashSet<int> ConfirmedMissingMaterialLotOrderIds { get; } = [];
+    private HashSet<int> ExpandedHistoryOrderIds { get; } = [];
+
+    private bool IsGenericDeclaration => Model is not null && FlowService.TryGetWorkAction(Model.ActionId, out var action) && FlowService.IsGenericDeclarationAction(action);
+    private DeclarationNoteTypeViewModel? SelectedNoteType => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == Model.SelectedNoteTypeId);
+    private bool SelectedNoteRequiresAnnotation => SelectedNoteType?.RequiresAnnotationText == true;
+    private bool ProblemSelectedNoteRequiresAnnotation => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == ProblemNoteTypeId)?.RequiresAnnotationText == true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await FlowState.EnsureLoadedAsync();
+        if (FlowState.SelectedOperatorIds.Count == 0)
+        {
+            Navigation.NavigateTo("/blazor/operators");
+            return;
+        }
+
+        LoadModel(null, null);
+        if (Model?.AutoFillMaxQuantityFromBarcode == true)
+        {
+            AutoFillMaxQuantities();
+            await FlowState.ConsumeAutoFillMaxQuantityAsync();
+        }
+
+        StateHasChanged();
+    }
+
+    private void LoadModel(string? validationMessage, string? successMessage)
+    {
+        Model = FlowService.BuildScreen4Model(FlowState, ActionId, validationMessage, successMessage);
+        ValidationMessage = Model.ValidationMessage;
+        SuccessMessage = Model.SuccessMessage;
+        LoadProblemNotesFromModel();
+    }
+
+    private void LoadProblemNotesFromModel()
+    {
+        ProblemNotes.Clear();
+        if (Model is null || string.IsNullOrWhiteSpace(Model.ProblemNotesJson))
+        {
+            return;
+        }
+
+        try
+        {
+            var notes = JsonSerializer.Deserialize<List<Screen4ProblemNotePostItemModel>>(Model.ProblemNotesJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? [];
+            ProblemNotes.AddRange(notes);
+        }
+        catch
+        {
+            ProblemNotes.Clear();
+        }
+    }
+
+    private void AutoFillMaxQuantities()
+    {
+        if (Model is null)
+        {
+            return;
+        }
+
+        foreach (var launch in Model.SelectedLaunches)
+        {
+            var remaining = GetRemainingQuantity(launch);
+            if (remaining > 0)
+            {
+                launch.QuantityDeclared = remaining;
+                if (Model.RequiresMaterialLotSelection && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
+                {
+                    launch.SelectedMaterialLotCode = launch.AvailableMaterialLots[0];
+                }
+            }
+        }
+
+        UpdateTotalDeclared();
+    }
+
+    private string GetLineDisplayTitle()
+    {
+        if (Model is null)
+        {
+            return string.Empty;
+        }
+
+        var lineDisplayTitle = string.IsNullOrWhiteSpace(Model.LineDisplayName) || string.Equals(Model.LineDisplayName, Model.AreaTitle, StringComparison.OrdinalIgnoreCase)
+            ? Model.AreaTitle
+            : $"{Model.AreaTitle} - {Model.LineDisplayName}";
+        var productionModeText = Model.ProductionMode switch
+        {
+            "riempimento" => " - Riempimento",
+            "macchina" => " - Macchina",
+            _ => string.Empty
+        };
+
+        return $"{lineDisplayTitle}{productionModeText}";
+    }
+
+    private void OnDeclarationDateChanged(ChangeEventArgs args)
+    {
+        if (Model is null)
+        {
+            return;
+        }
+
+        if (DateTime.TryParse(args.Value?.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+        {
+            Model.DeclarationDate = parsedDate.Date;
+        }
+    }
+
+    private void SelectGenericNoteType(int noteTypeId)
+    {
+        if (Model is null)
+        {
+            return;
+        }
+
+        Model.SelectedNoteTypeId = noteTypeId;
+    }
+
+    private string GetLotCellClass(Screen4SelectedLaunchViewModel launch)
+    {
+        var className = "screen4-table-lot-cell";
+        if (Model?.RequiresMaterialLotSelection == true)
+        {
+            className += " screen4-table-lot-cell--editable";
+        }
+
+        if (!string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode))
+        {
+            className += " has-material-lot";
+        }
+
+        return className;
+    }
+
+    private void SetMaxQuantity(Screen4SelectedLaunchViewModel launch)
+    {
+        launch.QuantityDeclared = GetRemainingQuantity(launch);
+        if (Model?.RequiresMaterialLotSelection == true && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
+        {
+            launch.SelectedMaterialLotCode = launch.AvailableMaterialLots[0];
+        }
+
+        ConfirmedOverLimitOrderIds.Remove(launch.OrderId);
+        UpdateTotalDeclared();
+    }
+
+    private void OpenQuantityModal(Screen4SelectedLaunchViewModel launch)
+    {
+        ActiveQuantityLaunch = launch;
+        QuantityKeypadValue = launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : string.Empty;
+    }
+
+    private void CloseQuantityModal()
+    {
+        ActiveQuantityLaunch = null;
+        QuantityKeypadValue = string.Empty;
+    }
+
+    private void PressQuantityKey(string key)
+    {
+        if (key == "C")
+        {
+            QuantityKeypadValue = string.Empty;
+            return;
+        }
+
+        if (key == "Del")
+        {
+            QuantityKeypadValue = QuantityKeypadValue.Length == 0 ? string.Empty : QuantityKeypadValue[..^1];
+            return;
+        }
+
+        if (key == "," && QuantityKeypadValue.Contains(',', StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        QuantityKeypadValue = key == "," && string.IsNullOrWhiteSpace(QuantityKeypadValue)
+            ? "0,"
+            : QuantityKeypadValue + key;
+    }
+
+    private void ConfirmQuantity()
+    {
+        if (ActiveQuantityLaunch is null)
+        {
+            return;
+        }
+
+        var value = ParseQuantity(QuantityKeypadValue);
+        if (!value.HasValue || value.Value <= 0)
+        {
+            ValidationMessage = "Inserisci una qta dichiarata valida.";
+            return;
+        }
+
+        ActiveQuantityLaunch.QuantityDeclared = value.Value;
+        if (value.Value <= GetRemainingQuantity(ActiveQuantityLaunch))
+        {
+            ConfirmedOverLimitOrderIds.Remove(ActiveQuantityLaunch.OrderId);
+        }
+
+        UpdateTotalDeclared();
+        CloseQuantityModal();
+    }
+
+    private void ClearActiveQuantity()
+    {
+        if (ActiveQuantityLaunch is not null)
+        {
+            ActiveQuantityLaunch.QuantityDeclared = null;
+            ConfirmedOverLimitOrderIds.Remove(ActiveQuantityLaunch.OrderId);
+            UpdateTotalDeclared();
+        }
+
+        CloseQuantityModal();
+    }
+
+    private void OpenMaterialLotModal(Screen4SelectedLaunchViewModel launch)
+    {
+        if (Model?.RequiresMaterialLotSelection != true)
+        {
+            return;
+        }
+
+        ActiveMaterialLotLaunch = launch;
+        MaterialLotChoice = launch.SelectedMaterialLotCode;
+    }
+
+    private void CloseMaterialLotModal()
+    {
+        ActiveMaterialLotLaunch = null;
+        MaterialLotChoice = string.Empty;
+    }
+
+    private void ClearMaterialLotChoice()
+    {
+        MaterialLotChoice = string.Empty;
+    }
+
+    private void ConfirmMaterialLot()
+    {
+        if (ActiveMaterialLotLaunch is not null)
+        {
+            ActiveMaterialLotLaunch.SelectedMaterialLotCode = MaterialLotChoice;
+            if (!string.IsNullOrWhiteSpace(MaterialLotChoice))
+            {
+                ConfirmedMissingMaterialLotOrderIds.Remove(ActiveMaterialLotLaunch.OrderId);
+            }
+        }
+
+        CloseMaterialLotModal();
+    }
+
+    private void UpdateTotalDeclared()
+    {
+        if (Model is not null)
+        {
+            Model.TotalDeclared = Model.SelectedLaunches.Sum(static item => item.QuantityDeclared ?? 0m);
+        }
+    }
+
+    private decimal GetRemainingQuantity(Screen4SelectedLaunchViewModel launch)
+    {
+        return Math.Max((launch.QuantityToProduce ?? 0m) - (launch.QuantityProduced ?? 0m), 0m);
+    }
+
+    private void ToggleHistory(int orderId)
+    {
+        if (!ExpandedHistoryOrderIds.Add(orderId))
+        {
+            ExpandedHistoryOrderIds.Remove(orderId);
+        }
+    }
+
+    private void OpenTimingModal()
+    {
+        ShowTimingModal = true;
+    }
+
+    private void CloseTimingModal()
+    {
+        ShowTimingModal = false;
+    }
+
+    private void AdjustTimingHours(int delta)
+    {
+        if (Model is not null)
+        {
+            Model.GlobalTimingHours = Math.Max(0, Model.GlobalTimingHours + delta);
+        }
+    }
+
+    private void ClearTiming()
+    {
+        if (Model is not null)
+        {
+            Model.GlobalTimingHours = 0;
+            Model.GlobalTimingMinutes = 0;
+        }
+    }
+
+    private void OpenProblemModal()
+    {
+        if (Model is null)
+        {
+            return;
+        }
+
+        ProblemNoteTypeId = Model.SelectedNoteTypeId ?? Model.AvailableNoteTypes.FirstOrDefault()?.Id ?? 0;
+        ProblemDescription = string.Empty;
+        ProblemHours = 0;
+        ProblemMinutes = 0;
+        ShowProblemModal = true;
+    }
+
+    private void CloseProblemModal()
+    {
+        ShowProblemModal = false;
+    }
+
+    private void ClearProblemDraft()
+    {
+        ProblemDescription = string.Empty;
+        ProblemHours = 0;
+        ProblemMinutes = 0;
+    }
+
+    private void ConfirmProblemNote()
+    {
+        if (ProblemNoteTypeId <= 0)
+        {
+            ValidationMessage = "Seleziona un tipo nota prima di confermare.";
+            return;
+        }
+
+        if (ProblemHours <= 0 && ProblemMinutes <= 0)
+        {
+            ValidationMessage = "Inserisci il timing del blocco o dell'anomalia prima di confermare.";
+            return;
+        }
+
+        if (ProblemSelectedNoteRequiresAnnotation && string.IsNullOrWhiteSpace(ProblemDescription))
+        {
+            ValidationMessage = "Inserisci la descrizione per la tipologia selezionata.";
+            return;
+        }
+
+        ProblemNotes.Add(new Screen4ProblemNotePostItemModel
+        {
+            NoteTypeId = ProblemNoteTypeId,
+            Description = ProblemDescription.Trim(),
+            Hours = ProblemHours,
+            Minutes = ProblemMinutes
+        });
+        ValidationMessage = null;
+        ClearProblemDraft();
+        CloseProblemModal();
+    }
+
+    private void ClearProblemNotes()
+    {
+        ProblemNotes.Clear();
+    }
+
+    private void RemoveProblemNote(int index)
+    {
+        if (index >= 0 && index < ProblemNotes.Count)
+        {
+            ProblemNotes.RemoveAt(index);
+        }
+    }
+
+    private string GetProblemSummary()
+    {
+        if (ProblemNotes.Count == 0)
+        {
+            return "Nessuna nota produzione o blocco";
+        }
+
+        return ProblemNotes.Count == 1
+            ? FormatProblemNote(ProblemNotes[0])
+            : $"{ProblemNotes.Count} note produzione o blocchi";
+    }
+
+    private string FormatProblemNote(Screen4ProblemNotePostItemModel note)
+    {
+        var noteType = Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == note.NoteTypeId)?.Description ?? "Nota";
+        var description = string.IsNullOrWhiteSpace(note.Description) ? string.Empty : $" - {note.Description}";
+        return $"{noteType}: {FormatTime(note.Hours, note.Minutes)}{description}";
+    }
+
+    private void OpenDatePinModal()
+    {
+        DatePin = string.Empty;
+        DatePinMessage = "Inserisci il PIN dell'operatore abilitato alla modifica data.";
+        ShowDatePinModal = true;
+    }
+
+    private void CloseDatePinModal()
+    {
+        ShowDatePinModal = false;
+    }
+
+    private async Task ConfirmDatePinAsync()
+    {
+        if (Model is null)
+        {
+            return;
+        }
+
+        var result = FlowService.AuthorizeDeclarationDateEdit(FlowState, DatePin);
+        DatePinMessage = result.Message;
+        if (!result.Success)
+        {
+            return;
+        }
+
+        await FlowState.SetDateEditAuthorizedAsync(true);
+        Model.IsDeclarationDateEditable = true;
+        CloseDatePinModal();
+    }
+
+    private async Task InsertAsync()
+    {
+        if (Model is null)
+        {
+            return;
+        }
+
+        ValidationMessage = null;
+        var postModel = BuildPostModel();
+        var timingMinutes = postModel.GetTimingMinutesPerOperator();
+        if (timingMinutes <= 0)
+        {
+            ValidationMessage = "Inserisci il timing prima di premere Inserisci.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            return;
+        }
+
+        if (!Model.IsTimingOnlyMode)
+        {
+            var declaredRows = postModel.GetDeclaredRows();
+            if (declaredRows.Count == 0)
+            {
+                ValidationMessage = "Inserisci almeno una qta dichiarata prima di premere Inserisci.";
+                await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+                return;
+            }
+
+            var overLimitLaunch = Model.SelectedLaunches.FirstOrDefault(launch =>
+                launch.QuantityDeclared.HasValue
+                && launch.QuantityDeclared.Value > GetRemainingQuantity(launch)
+                && !ConfirmedOverLimitOrderIds.Contains(launch.OrderId));
+            if (overLimitLaunch is not null)
+            {
+                var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", $"La qta dichiarata per il lotto {overLimitLaunch.LotCode} supera la qta residua disponibile. Confermi?");
+                if (!confirmed)
+                {
+                    return;
+                }
+
+                ConfirmedOverLimitOrderIds.Add(overLimitLaunch.OrderId);
+                postModel = BuildPostModel();
+            }
+
+            var missingMaterialLotLaunch = Model.RequiresMaterialLotSelection
+                ? Model.SelectedLaunches.FirstOrDefault(launch =>
+                    launch.QuantityDeclared.HasValue
+                    && launch.QuantityDeclared.Value > 0
+                    && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode)
+                    && launch.AvailableMaterialLots.Count > 0
+                    && !ConfirmedMissingMaterialLotOrderIds.Contains(launch.OrderId))
+                : null;
+            if (missingMaterialLotLaunch is not null)
+            {
+                var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", "Ci sono lotti disponibili in giacenza. Vuoi salvare comunque senza dichiarare il lotto materiale?");
+                if (!confirmed)
+                {
+                    return;
+                }
+
+                ConfirmedMissingMaterialLotOrderIds.Add(missingMaterialLotLaunch.OrderId);
+                postModel = BuildPostModel();
+            }
+        }
+
+        var result = FlowService.InsertDeclarations(FlowState, postModel);
+        if (!result.Success)
+        {
+            if (result.InvalidModel is not null)
+            {
+                Model = result.InvalidModel;
+                ValidationMessage = Model.ValidationMessage;
+                SuccessMessage = null;
+                LoadProblemNotesFromModel();
+            }
+            else
+            {
+                ValidationMessage = result.Message;
+            }
+
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage ?? "Non riesco a inserire la dichiarazione.");
+            return;
+        }
+
+        if (result.ClearFlow)
+        {
+            await FlowState.CompleteFlowAsync(result.Message ?? "Operazione inserita correttamente.");
+            Navigation.NavigateTo("/blazor");
+            return;
+        }
+
+        SuccessMessage = result.Message;
+    }
+
+    private Screen4InsertPostModel BuildPostModel()
+    {
+        if (Model is null)
+        {
+            return new Screen4InsertPostModel();
+        }
+
+        return new Screen4InsertPostModel
+        {
+            ActionId = Model.ActionId,
+            ProductionMode = Model.ProductionMode,
+            DeclarationDate = Model.DeclarationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ConfirmedOverLimitOrderIds = string.Join(',', ConfirmedOverLimitOrderIds.OrderBy(static id => id)),
+            ConfirmedMissingMaterialLotOrderIds = string.Join(',', ConfirmedMissingMaterialLotOrderIds.OrderBy(static id => id)),
+            GlobalTimingHours = Model.GlobalTimingHours,
+            GlobalTimingMinutes = Model.GlobalTimingMinutes,
+            SelectedNoteTypeId = Model.SelectedNoteTypeId,
+            GlobalProblemDescription = Model.GlobalProblemDescription ?? string.Empty,
+            GlobalProblemHours = Model.GlobalProblemHours,
+            GlobalProblemMinutes = Model.GlobalProblemMinutes,
+            ProblemNotesJson = JsonSerializer.Serialize(ProblemNotes),
+            Rows = Model.SelectedLaunches
+                .Select(static launch => new Screen4InsertRowPostItemModel
+                {
+                    OrderId = launch.OrderId,
+                    QuantityDeclared = launch.QuantityDeclared.HasValue ? launch.QuantityDeclared.Value.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty,
+                    SelectedMaterialLotCode = launch.SelectedMaterialLotCode
+                })
+                .ToList()
+        };
+    }
+
+    private void GoBack()
+    {
+        if (Model?.BackActionName == "Launches")
+        {
+            Navigation.NavigateTo($"/blazor/launches/{Model.ActionId}");
+            return;
+        }
+
+        Navigation.NavigateTo("/blazor/work-menu");
+    }
+
+    private static string FormatTime(int hours, int minutes)
+    {
+        return $"{Math.Max(0, hours):00} h {Math.Max(0, minutes):00} m";
+    }
+
+    private static string FormatQuantity(decimal value)
+    {
+        return value.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
+    }
+
+    private static decimal? ParseQuantity(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return null;
+        }
+
+        var normalizedValue = rawValue.Trim().Replace(" ", string.Empty).Replace(",", ".");
+        if (decimal.TryParse(normalizedValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var invariantValue))
+        {
+            return invariantValue;
+        }
+
+        return decimal.TryParse(rawValue, NumberStyles.Number, CultureInfo.GetCultureInfo("it-IT"), out var italianValue)
+            ? italianValue
+            : null;
+    }
+}

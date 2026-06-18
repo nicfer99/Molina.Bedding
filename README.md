@@ -1,9 +1,25 @@
 # Molina.Bedding.Mvc
 
-Progetto MVC ASP.NET 8 per il flusso **Dichiarazione produzione**.
+Progetto ASP.NET Core 8 per il flusso **Dichiarazione produzione**.
 
-## Stato del progetto in questo pacchetto
-Sono presenti queste schermate:
+Il flusso principale e ora Blazor Interactive Server. La parte MVC esistente resta disponibile come legacy/fallback.
+
+## Route applicative
+
+- Blazor principale: `/` e `/blazor`
+- MVC legacy/fallback: `/mvc/ProductionDeclaration/Start`
+- MVC esplicito esistente: `/ProductionDeclaration/Start`
+
+Route Blazor operative:
+
+- `/blazor/operators`
+- `/blazor/work-menu`
+- `/blazor/launches/{actionId}`
+- `/blazor/screen4/{actionId}`
+
+## Schermate
+
+Sono presenti queste schermate sia nel flusso MVC legacy sia nel flusso Blazor principale:
 
 0. **Inizia operazione**
 1. **Selezione operatore**
@@ -12,41 +28,59 @@ Sono presenti queste schermate:
 4. **Inserimento dichiarazione produzione**
 
 ## Collegamento operatori
-Gli operatori non vengono più letti dal file JSON di esempio.
 
-Origine attuale:
+Gli operatori vengono letti da:
+
 - database SQL Server `U_MOLINA`
 - tabella `dbo.X_OE_OPERATORI_BEDDING`
-- filtro: `bol_annullato = 0`
-- ordinamento: `des_operatore_bedding`
+- filtro `bol_annullato = 0`
+- ordinamento `des_operatore_bedding`
 
 ## Collegamento lotti e dichiarazioni
+
 Origine lotti:
+
 - vista `dbo.X_OE_VW_PROD_LANCIO`
-- per **tutti i lanci di produzione** il codice articolo materiale viene cercato in `dbo.X_OE_VW_PROD_LANCIO_MP` con filtro `bol_is_mp_bedding_riempimento = 1` e `prg_qpr = prg_ordine` della riga selezionata
-- se vengono trovate più righe MP bedding riempimento, il flusso viene bloccato con messaggio di errore
-- i lotti materiale vengono poi cercati su `dbo.X_OE_VW_LOTTI`, filtrando per `cod_art`, `cod_dep = '002'` e `ISNULL(qta_esistenza, 0) <> 0`
+- materiali da `dbo.X_OE_VW_PROD_LANCIO_MP`
+- lotti materiale da `dbo.X_OE_VW_LOTTI`
+- se vengono trovate piu righe MP bedding riempimento, il flusso resta bloccato con messaggio di errore
 
 Inserimento dichiarazioni:
+
 - `dbo.X_OE_PROD_DICH`
 - `dbo.X_OE_PROD_DICH_OPERATORI`
 - `dbo.X_OE_PROD_DICH_QPR`
 
 ## Note operative
-- nella schermata 4 il totale qta prodotte viene mostrato in alto
-- la linea è stata allargata per evitare l'andata a capo indesiderata
+
 - il timing salvato su database viene moltiplicato per il numero di operatori selezionati
-- la qta dichiarata viene inserita in un campo separato rispetto alla qta prodotta mostrata a video
-- per Trapunte viene valorizzato anche `cod_fase` nella testata dichiarazione: `05` in modalità **Riempimento**, `10` in modalità **Macchina**
-- se esistono dichiarazioni precedenti sul lotto selezionato, è disponibile il pulsante per mostrarle
-- il salvataggio avviene tramite il pulsante **Inserisci** in basso a destra
+- la `qta_dichiarata` resta separata dalla `qta_prodotta`
+- per Trapunte viene valorizzato `cod_fase`: `05` in Riempimento, `10` in Macchina
+- se esistono dichiarazioni precedenti sul lotto selezionato, e disponibile lo storico
+- il salvataggio avviene tramite il pulsante **Inserisci**
+
+## Migrazione Blazor
+
+- Blazor e MVC condividono `DataAccess`, `Models`, `Services`, query SQL e `wwwroot/css/site.css`.
+- Lo stato del flusso Blazor viene mantenuto da `BlazorProductionDeclarationState` e salvato in `localStorage`.
+- `ProductionDeclarationFlowService` replica l'orchestrazione del controller MVC per operatori, lavorazioni, lotti, barcode, timing, note, `cod_fase`, storico e salvataggio.
+- JavaScript dedicato a Blazor limitato a storage, focus barcode e dialog base: `wwwroot/js/blazor-production-declaration.js`.
 
 ## Script database aggiunti
+
 - `Database/20260407_update_X_OE_PROD_DICH_QPR_add_qta_dichiarata.sql`
 - `Database/20260407_update_X_OE_VW_PROD_LANCIO_qta_dichiarata.sql`
 - `Database/20260414_update_X_OE_PROD_DICH_add_cod_fase.sql`
 - `Database/20260512_update_X_OE_PROD_DICH_add_des_nota.sql`
 
-## Limite di verifica
-Nel container corrente non è disponibile `dotnet`, quindi non è stata eseguita una build reale.
-La verifica è stata statica sui file modificati.
+## Verifica
+
+Comandi consigliati:
+
+```powershell
+dotnet restore
+dotnet build
+dotnet test
+```
+
+Se il database non e raggiungibile, non sostituire la logica SQL: verificare build e UI, poi completare il test funzionale in ambiente con SQL Server `U_MOLINA`.

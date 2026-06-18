@@ -1,0 +1,106 @@
+@page "/blazor/operators"
+@inject NavigationManager Navigation
+@inject BlazorProductionDeclarationState FlowState
+@inject IProductionDeclarationFlowService FlowService
+@inject IJSRuntime JsRuntime
+
+<section class="page-section page-section--operators-loose">
+    <header class="page-header page-header--operators">
+        <div>
+            <div class="page-kicker">Schermata 1</div>
+            <h1>Selezione operatore</h1>
+            <p class="page-intro">Tocca uno o piu nomi, poi premi Avanti.</p>
+        </div>
+        <div class="page-header-note page-header-note--compact page-header-note--count">
+            <span class="note-label">Selezionati</span>
+            <strong id="selectionCount">@SelectedIds.Count</strong>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(ValidationMessage))
+    {
+        <div class="inline-alert" role="alert">@ValidationMessage</div>
+    }
+
+    @if (Model is null)
+    {
+        <div class="inline-alert">Caricamento operatori...</div>
+    }
+    else
+    {
+        <div id="operatorSelectionForm">
+            <div class="operator-grid operator-grid--large" id="operatorGrid" aria-label="Elenco operatori selezionabili">
+                @foreach (var operatorItem in Model.Operators)
+                {
+                    var isSelected = SelectedIds.Contains(operatorItem.Id);
+                    <button type="button"
+                            class="operator-card operator-card--large@(isSelected ? " is-selected" : string.Empty)"
+                            aria-pressed="@(isSelected ? "true" : "false")"
+                            @onclick="() => ToggleOperator(operatorItem.Id)">
+                        <span class="operator-card-icon dx-icon-user"></span>
+                        <span class="operator-card-text">
+                            <span class="operator-card-name">@operatorItem.Name</span>
+                        </span>
+                        <span class="operator-card-check dx-icon-check"></span>
+                    </button>
+                }
+            </div>
+
+            <div class="form-footer form-footer--split form-footer--operators">
+                <a href="/blazor" class="secondary-action-link">Indietro</a>
+                <button type="button" id="continueButton" class="primary-action-button" disabled="@(SelectedIds.Count == 0)" @onclick="ContinueAsync">
+                    Avanti
+                </button>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private OperatorSelectionViewModel? Model { get; set; }
+    private HashSet<int> SelectedIds { get; } = [];
+    private string? ValidationMessage { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await FlowState.EnsureLoadedAsync();
+        SelectedIds.Clear();
+        foreach (var id in FlowState.SelectedOperatorIds)
+        {
+            SelectedIds.Add(id);
+        }
+
+        Model = FlowService.BuildOperatorsModel(SelectedIds);
+        ValidationMessage = Model.ValidationMessage;
+        StateHasChanged();
+    }
+
+    private void ToggleOperator(int operatorId)
+    {
+        if (!SelectedIds.Add(operatorId))
+        {
+            SelectedIds.Remove(operatorId);
+        }
+
+        ValidationMessage = null;
+    }
+
+    private async Task ContinueAsync()
+    {
+        if (SelectedIds.Count == 0)
+        {
+            ValidationMessage = "Seleziona almeno un operatore prima di proseguire.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            return;
+        }
+
+        await FlowState.SetOperatorsAsync(SelectedIds);
+        Navigation.NavigateTo("/blazor/work-menu");
+    }
+}
+

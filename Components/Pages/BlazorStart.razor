@@ -1,0 +1,56 @@
+@page "/"
+@page "/blazor"
+@inject NavigationManager Navigation
+@inject BlazorProductionDeclarationState FlowState
+@inject IJSRuntime JsRuntime
+
+<section class="page-section page-section--narrow">
+    <div class="start-card">
+        <div class="page-kicker">Schermata 0</div>
+        <h1>Inizia operazione</h1>
+        <p class="page-intro page-intro--center">
+            Quando sei pronto, premi il pulsante qui sotto.
+        </p>
+
+        <div class="start-form">
+            <button type="button" id="startOperationButton" class="start-operation-button" @onclick="StartOperationAsync">
+                Inizia operazione
+            </button>
+        </div>
+    </div>
+</section>
+
+@code {
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await FlowState.EnsureLoadedAsync();
+        var message = FlowState.StartSuccessMessage;
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.success", message, "Inserimento completato");
+            await FlowState.ConsumeStartSuccessMessageAsync();
+        }
+
+        _initialized = true;
+        StateHasChanged();
+    }
+
+    private async Task StartOperationAsync()
+    {
+        if (!_initialized)
+        {
+            await FlowState.EnsureLoadedAsync();
+        }
+
+        await FlowState.ClearAsync();
+        Navigation.NavigateTo("/blazor/operators");
+    }
+}
+

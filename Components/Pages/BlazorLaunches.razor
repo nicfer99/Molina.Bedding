@@ -1,0 +1,529 @@
+@page "/blazor/launches/{ActionId}"
+@inject NavigationManager Navigation
+@inject BlazorProductionDeclarationState FlowState
+@inject IProductionDeclarationFlowService FlowService
+@inject IJSRuntime JsRuntime
+
+<section class="page-section page-section--wide page-section--launches"
+         data-launches-page="true"
+         data-direct-requires-material-lot-selection="@(Model?.RequiresMaterialLotSelection.ToString().ToLowerInvariant() ?? "false")">
+    <header class="page-header page-header--compact page-header--workmenu">
+        <div>
+            <div class="page-kicker">Schermata 3</div>
+            <h1>Selezione lotto</h1>
+            <p class="page-intro">@GetPageIntro()</p>
+        </div>
+        <div class="selected-operators-panel" aria-label="Operatori selezionati">
+            <div class="selected-operators-head">
+                <span class="note-label">Operatori selezionati</span>
+                <strong>@(Model?.SelectedOperators.Count ?? 0)</strong>
+            </div>
+            <div class="selected-operators-list">
+                @foreach (var operatorItem in Model?.SelectedOperators ?? Enumerable.Empty<OperatorItemViewModel>())
+                {
+                    <span class="selected-operator-chip">@operatorItem.Name</span>
+                }
+            </div>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+    {
+        <div class="inline-alert inline-alert--success" role="status">@SuccessMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ValidationMessage))
+    {
+        <div class="inline-alert" role="alert">@ValidationMessage</div>
+    }
+
+    @if (Model is null)
+    {
+        <div class="inline-alert">Caricamento lotti...</div>
+    }
+    else
+    {
+        <div id="launchSelectionForm">
+            <div class="barcode-panel">
+                <label for="lotBarcode" class="barcode-label">Barcode lotto</label>
+                <input type="text"
+                       id="lotBarcode"
+                       class="barcode-input"
+                       autocomplete="off"
+                       inputmode="text"
+                       @bind="BarcodeValue"
+                       @bind:event="oninput"
+                       @onkeydown="HandleBarcodeKeydownAsync" />
+            </div>
+
+            <div class="launch-toggle-panel">
+                <label class="launch-toggle-switch" for="autoInsertOnBarcodeToggle">
+                    <input type="checkbox" id="autoInsertOnBarcodeToggle" checked="@AutoInsertOnBarcode" @onchange="ToggleAutoInsertAsync" />
+                    <span class="launch-toggle-switch__track"></span>
+                    <span class="launch-toggle-switch__label">Attiva inserimento diretto quando scannerizzo il barcode</span>
+                </label>
+            </div>
+
+            <div class="launch-grid" aria-label="Lotti disponibili">
+                @foreach (var launch in Model.Launches)
+                {
+                    var isSelected = SelectedOrderIds.Contains(launch.OrderId);
+                    var prefill = GetPrefill(launch.OrderId);
+                    <article class="@GetLaunchCardClass(launch)"
+                             data-order-id="@launch.OrderId"
+                             data-lot-code="@launch.LotCode"
+                             aria-pressed="@(isSelected ? "true" : "false")"
+                             @onclick="() => ToggleLaunchAsync(launch)">
+                        <button type="button"
+                                class="launch-card-remove"
+                                aria-label="Togli questo lotto dalla selezione"
+                                title="Togli dalla selezione"
+                                @onclick:stopPropagation="true"
+                                @onclick="() => RemoveLaunchAsync(launch.OrderId)">
+                            x
+                        </button>
+                        <span class="launch-card-code">@launch.LotCode</span>
+                        @if (launch.IsClosed)
+                        {
+                            <span class="launch-card-status">Chiuso</span>
+                        }
+                        <span class="launch-card-doc-number">@(!string.IsNullOrWhiteSpace(launch.DocumentNumber) ? $"Doc. {launch.DocumentNumber}" : string.Empty)</span>
+                        <span class="launch-card-fields">
+                            <span class="launch-field">
+                                <span class="launch-field-label">Qta da produrre</span>
+                                <span class="launch-field-value">@FormatQuantity(launch.QuantityToProduce)</span>
+                            </span>
+                            <span class="launch-field">
+                                <span class="launch-field-label">Qta prodotta</span>
+                                <span class="launch-field-value@(launch.QuantityProduced.GetValueOrDefault() > 0 ? " launch-field-value--produced" : string.Empty)">@FormatQuantity(launch.QuantityProduced ?? 0m)</span>
+                            </span>
+                        </span>
+                        @if (isSelected)
+                        {
+                            <div class="launch-card-direct-summary" data-launch-prefill-summary="true">
+                                <div class="launch-card-direct-summary__row">
+                                    <span class="note-label">Qta impostata</span>
+                                    <strong>@(prefill?.QuantityDeclared ?? "-")</strong>
+                                </div>
+                                @if (Model.RequiresMaterialLotSelection)
+                                {
+                                    <div class="launch-card-direct-summary__row">
+                                        <span class="note-label">Lotto</span>
+                                        <button type="button"
+                                                class="launch-card-direct-summary__lot-button"
+                                                aria-label="Modifica il lotto selezionato in Schermata 3"
+                                                @onclick:stopPropagation="true"
+                                                @onclick="() => OpenDirectModal(launch)">
+                                            <span>@(string.IsNullOrWhiteSpace(prefill?.SelectedMaterialLotCode) ? "Nessun lotto selezionato" : prefill.SelectedMaterialLotCode)</span>
+                                        </button>
+                                    </div>
+                                }
+                                <div class="launch-card-direct-summary__row">
+                                    <span class="note-label">Dati</span>
+                                    <button type="button"
+                                            class="launch-card-direct-summary__lot-button"
+                                            @onclick:stopPropagation="true"
+                                            @onclick="() => OpenDirectModal(launch)">
+                                        Imposta dati
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+
+            <div class="form-footer form-footer--split">
+                <a href="/blazor/work-menu" class="secondary-action-link">Indietro</a>
+                <button type="button" id="launchContinueButton" class="primary-action-button launch-continue-button" disabled="@(SelectedOrderIds.Count == 0)" @onclick="ContinueAsync">
+                    Avanti
+                </button>
+            </div>
+        </div>
+    }
+</section>
+
+@if (ActiveDirectLaunch is not null)
+{
+    <div class="screen4-qty-modal" id="launchDirectInsertModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseDirectModal"></div>
+        <div class="screen4-qty-modal__dialog launch-direct-modal" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Schermata 3</div>
+                    <h2>Dati da riportare in Schermata 4</h2>
+                    <div class="screen4-modal-lot">@ActiveDirectLaunch.LotCode</div>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseDirectModal" aria-label="Chiudi finestra">x</button>
+            </div>
+
+            <div class="screen4-qty-modal__content launch-direct-modal__content">
+                <div class="launch-direct-modal__sections@(Model?.RequiresMaterialLotSelection == true ? string.Empty : " launch-direct-modal__sections--single")">
+                    <section class="launch-direct-panel launch-direct-panel--quantity" aria-label="Sezione quantita">
+                        <div class="launch-direct-panel__header launch-direct-panel__header--stacked">
+                            <div>
+                                <div class="page-kicker">Quantita</div>
+                                <strong class="launch-direct-panel__title">Imposta la quantita dichiarata</strong>
+                                <p class="screen4-qty-modal__intro launch-direct-panel__intro">Scegli se usare la qta massima residua oppure una qta parziale.</p>
+                            </div>
+                        </div>
+
+                        <div class="screen4-qty-modal__info">
+                            <div class="screen4-qty-modal__info-box">
+                                <span class="note-label">Qta residua</span>
+                                <strong>@FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch))</strong>
+                            </div>
+                            <div class="screen4-qty-modal__info-box screen4-qty-modal__info-box--declared">
+                                <span class="note-label">Qta impostata</span>
+                                <strong>@(string.IsNullOrWhiteSpace(DirectQuantity) ? "0" : DirectQuantity)</strong>
+                            </div>
+                        </div>
+
+                        <div class="launch-direct-qty-actions" aria-label="Scelta quantita">
+                            <button type="button" class="screen4-slot-button screen4-slot-button--max launch-direct-qty-action" @onclick="SetDirectMax">Max</button>
+                            <input class="screen4-date-input" inputmode="decimal" placeholder="Qta Parziale" @bind="DirectQuantity" />
+                        </div>
+
+                        <div class="screen4-time-grid">
+                            <div class="screen4-time-section">
+                                <div class="screen4-time-section__label">Ore timing</div>
+                                <input class="screen4-date-input" type="number" min="0" @bind="DirectTimingHours" />
+                            </div>
+                            <div class="screen4-time-section">
+                                <div class="screen4-time-section__label">Minuti timing</div>
+                                <input class="screen4-date-input" type="number" min="0" max="59" @bind="DirectTimingMinutes" />
+                            </div>
+                        </div>
+                    </section>
+
+                    @if (Model?.RequiresMaterialLotSelection == true)
+                    {
+                        <section class="launch-direct-panel launch-direct-panel--lot" aria-label="Sezione lotto">
+                            <div class="launch-direct-panel__header launch-direct-panel__header--stacked">
+                                <div>
+                                    <div class="page-kicker">Lotto</div>
+                                    <strong class="launch-direct-panel__title">@(string.IsNullOrWhiteSpace(DirectMaterialLotCode) ? "Nessun lotto selezionato" : DirectMaterialLotCode)</strong>
+                                    <p class="screen4-qty-modal__intro launch-direct-panel__intro">Puoi selezionare il lotto materiale, oppure proseguire senza lotto.</p>
+                                </div>
+                            </div>
+                            <div class="launch-direct-material-lot-panel">
+                                <div class="material-lot-reference-list" aria-label="Lotti disponibili">
+                                    @foreach (var materialLot in ActiveDirectLaunch.AvailableMaterialLots)
+                                    {
+                                        <button type="button"
+                                                class="material-lot-reference-chip@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
+                                                @onclick="() => DirectMaterialLotCode = materialLot">
+                                            @materialLot
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </section>
+                    }
+                </div>
+            </div>
+
+            <div class="screen4-qty-modal__footer">
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="CloseDirectModal">Chiudi</button>
+                <div class="screen4-qty-footer-actions">
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmDirectInsertAsync">Conferma dati</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string ActionId { get; set; } = string.Empty;
+    [SupplyParameterFromQuery(Name = "productionMode")] public string? ProductionMode { get; set; }
+
+    private ProductionLaunchSelectionViewModel? Model { get; set; }
+    private HashSet<int> SelectedOrderIds { get; } = [];
+    private Dictionary<int, ProductionLaunchPrefillSelectionItem> PrefillSelections { get; } = [];
+    private bool AutoInsertOnBarcode { get; set; }
+    private string BarcodeValue { get; set; } = string.Empty;
+    private string? ValidationMessage { get; set; }
+    private string? SuccessMessage { get; set; }
+    private ProductionLaunchItemViewModel? ActiveDirectLaunch { get; set; }
+    private string DirectQuantity { get; set; } = string.Empty;
+    private string DirectMaterialLotCode { get; set; } = string.Empty;
+    private int DirectTimingHours { get; set; }
+    private int DirectTimingMinutes { get; set; }
+    private bool DirectConfirmOverLimit { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await FlowState.EnsureLoadedAsync();
+        if (FlowState.SelectedOperatorIds.Count == 0)
+        {
+            Navigation.NavigateTo("/blazor/operators");
+            return;
+        }
+
+        var normalizedMode = FlowService.NormalizeProductionMode(ProductionMode) ?? FlowState.ProductionMode;
+        if (!string.Equals(FlowState.SelectedActionId, ActionId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(FlowState.ProductionMode, normalizedMode, StringComparison.OrdinalIgnoreCase))
+        {
+            await FlowState.SetActionAsync(ActionId, normalizedMode);
+        }
+
+        await LoadModelAsync(null, null);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+        StateHasChanged();
+    }
+
+    private async Task LoadModelAsync(string? validationMessage, string? successMessage)
+    {
+        Model = FlowService.BuildLaunchesModel(FlowState, ActionId, ProductionMode, validationMessage, successMessage);
+        ValidationMessage = Model.ValidationMessage;
+        SuccessMessage = Model.SuccessMessage;
+        AutoInsertOnBarcode = Model.AutoInsertOnBarcodeEnabled;
+        SelectedOrderIds.Clear();
+        foreach (var id in FlowState.SelectedLaunchOrderIds)
+        {
+            SelectedOrderIds.Add(id);
+        }
+
+        PrefillSelections.Clear();
+        foreach (var item in FlowState.LaunchPrefillSelections)
+        {
+            PrefillSelections[item.OrderId] = item;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private string GetPageIntro()
+    {
+        if (Model is null)
+        {
+            return string.Empty;
+        }
+
+        var modeText = Model.ProductionMode switch
+        {
+            "riempimento" => " - Riempimento",
+            "macchina" => " - Macchina",
+            _ => string.Empty
+        };
+
+        return $"{Model.AreaTitle} - {Model.ActionText}{modeText}";
+    }
+
+    private string GetLaunchCardClass(ProductionLaunchItemViewModel launch)
+    {
+        return "launch-card"
+            + (SelectedOrderIds.Contains(launch.OrderId) ? " is-selected" : string.Empty)
+            + (launch.IsClosed ? " is-closed" : string.Empty);
+    }
+
+    private async Task ToggleLaunchAsync(ProductionLaunchItemViewModel launch)
+    {
+        if (!SelectedOrderIds.Add(launch.OrderId))
+        {
+            SelectedOrderIds.Remove(launch.OrderId);
+            PrefillSelections.Remove(launch.OrderId);
+        }
+
+        await PersistSelectionAsync(false);
+    }
+
+    private async Task RemoveLaunchAsync(int orderId)
+    {
+        SelectedOrderIds.Remove(orderId);
+        PrefillSelections.Remove(orderId);
+        await PersistSelectionAsync(false);
+    }
+
+    private async Task PersistSelectionAsync(bool autoFillMax)
+    {
+        await FlowState.SetLaunchSelectionAsync(
+            ActionId,
+            FlowService.NormalizeProductionMode(ProductionMode) ?? FlowState.ProductionMode,
+            SelectedOrderIds,
+            AutoInsertOnBarcode,
+            autoFillMax,
+            PrefillSelections.Values);
+    }
+
+    private async Task ToggleAutoInsertAsync(ChangeEventArgs args)
+    {
+        AutoInsertOnBarcode = args.Value is bool value && value;
+        await FlowState.SetAutoInsertAsync(AutoInsertOnBarcode);
+    }
+
+    private async Task HandleBarcodeKeydownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter")
+        {
+            return;
+        }
+
+        await AddBarcodeAsync();
+    }
+
+    private async Task AddBarcodeAsync()
+    {
+        var result = FlowService.AddLaunchFromBarcode(FlowState, ActionId, ProductionMode, BarcodeValue, SelectedOrderIds, PrefillSelections.Values);
+        BarcodeValue = string.Empty;
+        if (!result.Success)
+        {
+            await LoadModelAsync(result.ValidationMessage, null);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", result.ValidationMessage ?? "Barcode lotto non riconosciuto.");
+            return;
+        }
+
+        SelectedOrderIds.Clear();
+        foreach (var id in result.SelectedOrderIds)
+        {
+            SelectedOrderIds.Add(id);
+        }
+
+        PrefillSelections.Clear();
+        foreach (var item in result.PrefillSelections)
+        {
+            PrefillSelections[item.OrderId] = item;
+        }
+
+        await PersistSelectionAsync(false);
+        await LoadModelAsync(null, result.SuccessMessage);
+
+        if (AutoInsertOnBarcode && result.OrderId.HasValue)
+        {
+            var launch = Model?.Launches.FirstOrDefault(item => item.OrderId == result.OrderId.Value);
+            if (launch is not null && GetRemainingQuantity(launch) > 0)
+            {
+                OpenDirectModal(launch);
+            }
+        }
+
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+    }
+
+    private async Task ContinueAsync()
+    {
+        if (SelectedOrderIds.Count == 0)
+        {
+            ValidationMessage = "Seleziona almeno un lotto prima di proseguire.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage);
+            return;
+        }
+
+        await PersistSelectionAsync(false);
+        Navigation.NavigateTo($"/blazor/screen4/{ActionId}");
+    }
+
+    private ProductionLaunchPrefillSelectionItem? GetPrefill(int orderId)
+    {
+        return PrefillSelections.TryGetValue(orderId, out var item) ? item : null;
+    }
+
+    private void OpenDirectModal(ProductionLaunchItemViewModel launch)
+    {
+        ActiveDirectLaunch = launch;
+        var prefill = GetPrefill(launch.OrderId);
+        DirectQuantity = prefill?.QuantityDeclared ?? string.Empty;
+        DirectMaterialLotCode = prefill?.SelectedMaterialLotCode ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(DirectMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
+        {
+            DirectMaterialLotCode = launch.AvailableMaterialLots[0];
+        }
+
+        DirectTimingHours = 0;
+        DirectTimingMinutes = 0;
+        DirectConfirmOverLimit = false;
+    }
+
+    private void CloseDirectModal()
+    {
+        ActiveDirectLaunch = null;
+        DirectQuantity = string.Empty;
+        DirectMaterialLotCode = string.Empty;
+        DirectTimingHours = 0;
+        DirectTimingMinutes = 0;
+        DirectConfirmOverLimit = false;
+    }
+
+    private void SetDirectMax()
+    {
+        if (ActiveDirectLaunch is null)
+        {
+            return;
+        }
+
+        DirectQuantity = FormatQuantity(GetRemainingQuantity(ActiveDirectLaunch));
+    }
+
+    private async Task ConfirmDirectInsertAsync()
+    {
+        if (ActiveDirectLaunch is null)
+        {
+            return;
+        }
+
+        if (Model?.RequiresMaterialLotSelection == true
+            && string.IsNullOrWhiteSpace(DirectMaterialLotCode)
+            && ActiveDirectLaunch.AvailableMaterialLots.Count > 0)
+        {
+            var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", "Ci sono lotti disponibili in giacenza. Vuoi salvare comunque senza dichiarare il lotto materiale?");
+            if (!confirmed)
+            {
+                return;
+            }
+        }
+
+        var postModel = new ProductionLaunchDirectInsertPostModel
+        {
+            ActionId = ActionId,
+            ProductionMode = FlowService.NormalizeProductionMode(ProductionMode) ?? FlowState.ProductionMode,
+            AutoInsertOnBarcodeEnabled = AutoInsertOnBarcode,
+            OrderId = ActiveDirectLaunch.OrderId,
+            QuantityDeclared = DirectQuantity,
+            SelectedMaterialLotCode = DirectMaterialLotCode,
+            TimingHours = DirectTimingHours,
+            TimingMinutes = DirectTimingMinutes,
+            ConfirmOverLimit = DirectConfirmOverLimit
+        };
+
+        var result = FlowService.InsertDirectDeclaration(FlowState, postModel);
+        if (!result.Success && result.Message?.Contains("supera la qta residua", StringComparison.OrdinalIgnoreCase) == true && !DirectConfirmOverLimit)
+        {
+            var confirmed = await JsRuntime.InvokeAsync<bool>("molinaBlazorDialog.confirm", result.Message);
+            if (confirmed)
+            {
+                DirectConfirmOverLimit = true;
+                await ConfirmDirectInsertAsync();
+            }
+
+            return;
+        }
+
+        if (!result.Success)
+        {
+            ValidationMessage = result.Message;
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage ?? "Non riesco a inserire la dichiarazione.");
+            return;
+        }
+
+        SelectedOrderIds.Clear();
+        PrefillSelections.Clear();
+        await PersistSelectionAsync(false);
+        CloseDirectModal();
+        await LoadModelAsync(null, result.Message);
+    }
+
+    private decimal GetRemainingQuantity(ProductionLaunchItemViewModel launch)
+    {
+        return Math.Max(launch.QuantityToProduce - (launch.QuantityProduced ?? 0m), 0m);
+    }
+
+    private static string FormatQuantity(decimal value)
+    {
+        return value.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
+    }
+}

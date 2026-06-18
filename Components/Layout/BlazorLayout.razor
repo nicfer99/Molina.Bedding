@@ -1,0 +1,103 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject BlazorProductionDeclarationState FlowState
+
+<div class="app-frame">
+    <aside class="app-sidebar">
+        <div class="brand-block">
+            <div class="brand-mark">M</div>
+            <div>
+                <div class="brand-title">Molina Bedding</div>
+                <div class="brand-subtitle">Dichiarazione produzione</div>
+            </div>
+        </div>
+
+        <nav class="stepper-nav" aria-label="Avanzamento schermate">
+            <div class="stepper-item @GetStepClass(0)">
+                <span class="stepper-index">0</span>
+                <div><div class="stepper-title">Inizio</div></div>
+            </div>
+            <div class="stepper-item @GetStepClass(1)">
+                <span class="stepper-index">1</span>
+                <div><div class="stepper-title">Operatori</div></div>
+            </div>
+            <div class="stepper-item @GetStepClass(2)">
+                <span class="stepper-index">2</span>
+                <div><div class="stepper-title">Lavorazione</div></div>
+            </div>
+            <div class="stepper-item @GetStepClass(3)">
+                <span class="stepper-index">3</span>
+                <div><div class="stepper-title">Lotti</div></div>
+            </div>
+            <div class="stepper-item @GetStepClass(4)">
+                <span class="stepper-index">4</span>
+                <div><div class="stepper-title">Operazione</div></div>
+            </div>
+        </nav>
+
+        @if (CurrentStep > 0)
+        {
+            <div class="sidebar-reset-form">
+                <button type="button" class="sidebar-reset-button" @onclick="ResetAsync">Reset</button>
+            </div>
+        }
+    </aside>
+
+    <main class="app-main" role="main">
+        @Body
+    </main>
+</div>
+
+@code {
+    private int CurrentStep
+    {
+        get
+        {
+            var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/').ToLowerInvariant();
+            if (path is "" or "blazor")
+            {
+                return 0;
+            }
+
+            if (path.StartsWith("blazor/operators", StringComparison.Ordinal))
+            {
+                return 1;
+            }
+
+            if (path.StartsWith("blazor/work-menu", StringComparison.Ordinal))
+            {
+                return 2;
+            }
+
+            if (path.StartsWith("blazor/launches", StringComparison.Ordinal))
+            {
+                return 3;
+            }
+
+            if (path.StartsWith("blazor/screen4", StringComparison.Ordinal))
+            {
+                return 4;
+            }
+
+            return 0;
+        }
+    }
+
+    private string GetStepClass(int step)
+    {
+        if (CurrentStep == step)
+        {
+            return "is-current";
+        }
+
+        return CurrentStep > step ? "is-complete" : string.Empty;
+    }
+
+    private async Task ResetAsync()
+    {
+        await FlowState.EnsureLoadedAsync();
+        await FlowState.ClearAsync();
+        Navigation.NavigateTo("/blazor");
+    }
+}
+

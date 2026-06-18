@@ -1,0 +1,18 @@
+<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(BlazorLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(BlazorLayout)">
+            <section class="page-section page-section--narrow">
+                <div class="start-card">
+                    <div class="page-kicker">Blazor</div>
+                    <h1>Pagina non trovata</h1>
+                    <a class="primary-action-button" href="/blazor">Torna all'inizio</a>
+                </div>
+            </section>
+        </LayoutView>
+    </NotFound>
+</Router>
+

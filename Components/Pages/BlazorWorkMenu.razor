@@ -1,0 +1,162 @@
+@page "/blazor/work-menu"
+@inject NavigationManager Navigation
+@inject BlazorProductionDeclarationState FlowState
+@inject IProductionDeclarationFlowService FlowService
+
+<section class="page-section page-section--wide page-section--workmenu-expanded">
+    <header class="page-header page-header--compact page-header--workmenu">
+        <div>
+            <div class="page-kicker">Schermata 2</div>
+            <h1>Selezione lavorazione</h1>
+            <p class="page-intro">Scegli l'area e premi l'operazione da registrare.</p>
+        </div>
+        <div class="selected-operators-panel" aria-label="Operatori selezionati">
+            <div class="selected-operators-head">
+                <span class="note-label">Operatori selezionati</span>
+                <strong>@(Model?.SelectedOperators.Count ?? 0)</strong>
+            </div>
+            <div class="selected-operators-list">
+                @foreach (var operatorItem in Model?.SelectedOperators ?? [])
+                {
+                    <span class="selected-operator-chip">@operatorItem.Name</span>
+                }
+            </div>
+        </div>
+    </header>
+
+    @if (Model is null)
+    {
+        <div class="inline-alert">Caricamento lavorazioni...</div>
+    }
+    else
+    {
+        <div class="work-area-grid work-area-grid--aligned">
+            @foreach (var area in Model.Areas)
+            {
+                <section class="work-area-card work-area-card--large" aria-labelledby="@($"{area.Id}-title")">
+                    <header class="work-area-header work-area-header--centered">
+                        <h2 id="@($"{area.Id}-title")">@area.Title</h2>
+                    </header>
+
+                    <div class="work-area-actions work-area-actions--large">
+                        @for (var rowIndex = 1; rowIndex <= 3; rowIndex++)
+                        {
+                            var action = area.Actions.FirstOrDefault(item => item.Row == rowIndex);
+                            if (action is null)
+                            {
+                                <div class="action-slot action-slot--placeholder" aria-hidden="true"></div>
+                                continue;
+                            }
+
+                            <div class="action-slot action-slot--large">
+                                <button type="button"
+                                        class="dx-action-button dx-action-button--large dx-action-button--@action.Tone"
+                                        @onclick="() => OpenActionAsync(action.Id)">
+                                    @action.Text
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+
+        <div class="form-footer form-footer--split">
+            <a href="/blazor/operators" class="secondary-action-link">Indietro</a>
+        </div>
+    }
+</section>
+
+@if (ShowTrapunteModeModal)
+{
+    <div class="screen4-qty-modal" id="trapunteProductionModeModal">
+        <div class="screen4-qty-modal__backdrop" @onclick="CloseTrapunteModeModal"></div>
+        <div class="screen4-qty-modal__dialog workmenu-mode-modal" role="dialog" aria-modal="true">
+            <div class="screen4-qty-modal__header">
+                <div>
+                    <div class="page-kicker">Linea Trapunte</div>
+                    <h2>Scegli la modalita</h2>
+                </div>
+                <button type="button" class="screen4-qty-modal__close" @onclick="CloseTrapunteModeModal" aria-label="Chiudi finestra">x</button>
+            </div>
+            <div class="workmenu-mode-modal__content">
+                <button type="button" class="workmenu-mode-choice" @onclick="ContinueTrapunteRiempimentoAsync">Riempimento</button>
+                <button type="button" class="workmenu-mode-choice" @onclick="ContinueTrapunteMacchinaAsync">Macchina</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private WorkMenuViewModel? Model { get; set; }
+    private bool ShowTrapunteModeModal { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await FlowState.EnsureLoadedAsync();
+        if (FlowState.SelectedOperatorIds.Count == 0)
+        {
+            Navigation.NavigateTo("/blazor/operators");
+            return;
+        }
+
+        Model = FlowService.BuildWorkMenuModel(FlowState.SelectedOperatorIds);
+        if (Model.SelectedOperators.Count == 0)
+        {
+            Navigation.NavigateTo("/blazor/operators");
+            return;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OpenActionAsync(string actionId)
+    {
+        if (!FlowService.TryGetWorkAction(actionId, out var action))
+        {
+            return;
+        }
+
+        if (action.Id == "trapunte-dichiarazione-produzione")
+        {
+            ShowTrapunteModeModal = true;
+            return;
+        }
+
+        await FlowState.SetActionAsync(action.Id, null);
+        if (FlowService.IsProductionLaunchAction(action))
+        {
+            Navigation.NavigateTo($"/blazor/launches/{action.Id}");
+            return;
+        }
+
+        Navigation.NavigateTo($"/blazor/screen4/{action.Id}");
+    }
+
+    private async Task ContinueTrapunteAsync(string productionMode)
+    {
+        const string actionId = "trapunte-dichiarazione-produzione";
+        await FlowState.SetActionAsync(actionId, productionMode);
+        Navigation.NavigateTo($"/blazor/launches/{actionId}?productionMode={productionMode}");
+    }
+
+    private Task ContinueTrapunteRiempimentoAsync()
+    {
+        return ContinueTrapunteAsync("riempimento");
+    }
+
+    private Task ContinueTrapunteMacchinaAsync()
+    {
+        return ContinueTrapunteAsync("macchina");
+    }
+
+    private void CloseTrapunteModeModal()
+    {
+        ShowTrapunteModeModal = false;
+    }
+}

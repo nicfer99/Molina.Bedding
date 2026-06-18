@@ -1,0 +1,1206 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Molina.Bedding.Mvc.Models;
+
+namespace Molina.Bedding.Mvc.Services;
+
+public sealed class ProductionDeclarationFlowService : IProductionDeclarationFlowService
+{
+    private static readonly IReadOnlyDictionary<string, ProductionWorkActionDefinition> WorkActionMap =
+        new Dictionary<string, ProductionWorkActionDefinition>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["cassette-dichiarazione-produzione"] = new("cassette-dichiarazione-produzione", "Linea Kassetten", "Dichiarazione produzione", WorkFlowType.ProductionLaunches, "BED-RC"),
+            ["trapunte-dichiarazione-produzione"] = new("trapunte-dichiarazione-produzione", "Linea Trapunte", "Dichiarazione produzione", WorkFlowType.ProductionLaunches, "BED-RT"),
+            ["guanciali-dichiarazione-produzione"] = new("guanciali-dichiarazione-produzione", "Linea Guanciali", "Dichiarazione produzione", WorkFlowType.ProductionLaunches, "BED-G"),
+            ["cassette-dichiarazione-generica"] = new("cassette-dichiarazione-generica", "Linea Kassetten", "Dichiarazione generica", WorkFlowType.Screen4Direct, "BED-RC"),
+            ["guanciali-dichiarazione-generica"] = new("guanciali-dichiarazione-generica", "Linea Guanciali", "Dichiarazione generica", WorkFlowType.Screen4Direct, "BED-G"),
+            ["pavimento-dichiarazione-generica"] = new("pavimento-dichiarazione-generica", "Pavimento", "Dichiarazione generica", WorkFlowType.Screen4Direct, null),
+            ["trapunte-dichiarazione-generica"] = new("trapunte-dichiarazione-generica", "Linea Trapunte", "Dichiarazione generica", WorkFlowType.Screen4Direct, "BED-RT")
+        };
+
+    private readonly IOperatorCatalogService _operatorCatalogService;
+    private readonly IWorkMenuService _workMenuService;
+    private readonly IProductionLaunchService _productionLaunchService;
+    private readonly IProductionDeclarationPersistenceService _productionDeclarationPersistenceService;
+    private readonly IDeclarationNoteTypeCatalogService _declarationNoteTypeCatalogService;
+    private readonly IDeclarationDateAuthorizationService _declarationDateAuthorizationService;
+
+    public ProductionDeclarationFlowService(
+        IOperatorCatalogService operatorCatalogService,
+        IWorkMenuService workMenuService,
+        IProductionLaunchService productionLaunchService,
+        IProductionDeclarationPersistenceService productionDeclarationPersistenceService,
+        IDeclarationNoteTypeCatalogService declarationNoteTypeCatalogService,
+        IDeclarationDateAuthorizationService declarationDateAuthorizationService)
+    {
+        _operatorCatalogService = operatorCatalogService;
+        _workMenuService = workMenuService;
+        _productionLaunchService = productionLaunchService;
+        _productionDeclarationPersistenceService = productionDeclarationPersistenceService;
+        _declarationNoteTypeCatalogService = declarationNoteTypeCatalogService;
+        _declarationDateAuthorizationService = declarationDateAuthorizationService;
+    }
+
+    public bool TryGetWorkAction(string? actionId, out ProductionWorkActionDefinition actionDefinition)
+    {
+        if (!string.IsNullOrWhiteSpace(actionId) && WorkActionMap.TryGetValue(actionId, out actionDefinition!))
+        {
+            return true;
+        }
+
+        actionDefinition = null!;
+        return false;
+    }
+
+    public bool IsProductionLaunchAction(ProductionWorkActionDefinition actionDefinition)
+    {
+        return actionDefinition.FlowType == WorkFlowType.ProductionLaunches;
+    }
+
+    public bool IsGenericDeclarationAction(ProductionWorkActionDefinition actionDefinition)
+    {
+        return actionDefinition.Id.EndsWith("-dichiarazione-generica", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public bool RequiresMaterialLotSelection(ProductionWorkActionDefinition actionDefinition, string? productionMode)
+    {
+        if (actionDefinition.FlowType != WorkFlowType.ProductionLaunches)
+        {
+            return false;
+        }
+
+        return !(IsTrapunteProductionAction(actionDefinition)
+            && string.Equals(NormalizeProductionMode(productionMode), ProductionModes.Macchina, StringComparison.Ordinal));
+    }
+
+    public string? NormalizeProductionMode(string? productionMode)
+    {
+        var normalizedValue = (productionMode ?? string.Empty).Trim().ToLowerInvariant();
+        return normalizedValue switch
+        {
+            ProductionModes.Riempimento => ProductionModes.Riempimento,
+            ProductionModes.Macchina => ProductionModes.Macchina,
+            _ => null
+        };
+    }
+
+    public string? GetDeclarationPhaseCode(ProductionWorkActionDefinition actionDefinition, string? productionMode)
+    {
+        if (!IsTrapunteProductionAction(actionDefinition))
+        {
+            return null;
+        }
+
+        return NormalizeProductionMode(productionMode) switch
+        {
+            ProductionModes.Riempimento => "05",
+            ProductionModes.Macchina => "10",
+            _ => null
+        };
+    }
+
+    public OperatorSelectionViewModel BuildOperatorsModel(IEnumerable<int> selectedIds)
+    {
+        var selectedIdsValue = string.Join(',', selectedIds.Where(static id => id > 0).Distinct().OrderBy(static id => id));
+        try
+        {
+            var model = new OperatorSelectionViewModel
+            {
+                Operators = _operatorCatalogService.GetAllActive().ToList(),
+                SelectedOperatorIds = selectedIdsValue
+            };
+
+            return model.Operators.Count == 0
+                ? model with { ValidationMessage = "Non ci sono operatori disponibili. Controlla i dati presenti a sistema." }
+                : model;
+        }
+        catch
+        {
+            return new OperatorSelectionViewModel
+            {
+                Operators = [],
+                SelectedOperatorIds = selectedIdsValue,
+                ValidationMessage = "Non riesco a caricare gli operatori. Controlla il collegamento al database e riprova."
+            };
+        }
+    }
+
+    public WorkMenuViewModel BuildWorkMenuModel(IEnumerable<int> selectedIds)
+    {
+        return new WorkMenuViewModel
+        {
+            SelectedOperators = LoadSelectedOperators(selectedIds),
+            Areas = _workMenuService.GetInitialAreas().ToList()
+        };
+    }
+
+    public ProductionLaunchSelectionViewModel BuildLaunchesModel(
+        BlazorProductionDeclarationState state,
+        string actionId,
+        string? productionMode,
+        string? validationMessage,
+        string? successMessage)
+    {
+        var selectedOperators = LoadSelectedOperators(state.SelectedOperatorIds);
+        if (!TryGetWorkAction(actionId, out var actionDefinition)
+            || actionDefinition.FlowType != WorkFlowType.ProductionLaunches
+            || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            return new ProductionLaunchSelectionViewModel
+            {
+                SelectedOperators = selectedOperators,
+                ValidationMessage = "Operazione non valida. Torna alla selezione lavorazione."
+            };
+        }
+
+        var normalizedProductionMode = ResolveProductionMode(actionDefinition, productionMode, state.ProductionMode);
+        if (IsTrapunteProductionAction(actionDefinition) && string.IsNullOrWhiteSpace(normalizedProductionMode))
+        {
+            return BuildLaunchesViewModel(actionDefinition, string.Empty, selectedOperators, [], [], state.AutoInsertOnBarcode, "[]", "Scegli la modalita Trapunte prima di proseguire.", null);
+        }
+
+        try
+        {
+            var launches = LoadLaunchesForSelection(actionDefinition, normalizedProductionMode, state.SelectedLaunchOrderIds, ShouldResolveMaterialLots(actionDefinition));
+            return BuildLaunchesViewModel(
+                actionDefinition,
+                normalizedProductionMode,
+                selectedOperators,
+                launches,
+                state.SelectedLaunchOrderIds,
+                state.AutoInsertOnBarcode,
+                SerializeLaunchPrefillSelections(state.LaunchPrefillSelections),
+                validationMessage ?? (launches.Count == 0 ? "Non ci sono lotti disponibili per questa linea." : null),
+                successMessage);
+        }
+        catch
+        {
+            return BuildLaunchesViewModel(
+                actionDefinition,
+                normalizedProductionMode,
+                selectedOperators,
+                [],
+                state.SelectedLaunchOrderIds,
+                state.AutoInsertOnBarcode,
+                SerializeLaunchPrefillSelections(state.LaunchPrefillSelections),
+                validationMessage ?? "Non riesco a caricare i lotti. Controlla il collegamento al database e riprova.",
+                successMessage);
+        }
+    }
+
+    public BarcodeLaunchResult AddLaunchFromBarcode(
+        BlazorProductionDeclarationState state,
+        string actionId,
+        string? productionMode,
+        string barcodeValue,
+        IEnumerable<int> selectedOrderIds,
+        IEnumerable<ProductionLaunchPrefillSelectionItem> prefillSelections)
+    {
+        if (!TryGetWorkAction(actionId, out var actionDefinition)
+            || actionDefinition.FlowType != WorkFlowType.ProductionLaunches
+            || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            return new BarcodeLaunchResult { ValidationMessage = "Operazione non valida. Torna alla selezione lavorazione." };
+        }
+
+        var normalizedProductionMode = ResolveProductionMode(actionDefinition, productionMode, state.ProductionMode);
+        if (IsTrapunteProductionAction(actionDefinition) && string.IsNullOrWhiteSpace(normalizedProductionMode))
+        {
+            return new BarcodeLaunchResult { ValidationMessage = "Scegli la modalita Trapunte prima di leggere il barcode." };
+        }
+
+        try
+        {
+            var matchingLaunches = ResolveLaunchesFromBarcode(actionDefinition.LineCode!, barcodeValue, ShouldResolveMaterialLots(actionDefinition)).ToList();
+            if (matchingLaunches.Count == 0)
+            {
+                return new BarcodeLaunchResult { ValidationMessage = "Barcode lotto non riconosciuto." };
+            }
+
+            if (matchingLaunches.Count > 1)
+            {
+                return new BarcodeLaunchResult { ValidationMessage = "Ho trovato piu lotti compatibili. Controlla il barcode e riprova." };
+            }
+
+            var launch = matchingLaunches[0];
+            var selectedIds = selectedOrderIds
+                .Append(launch.OrderId)
+                .Where(static value => value > 0)
+                .Distinct()
+                .OrderBy(static value => value)
+                .ToList();
+
+            var filteredPrefills = prefillSelections
+                .Where(item => selectedIds.Contains(item.OrderId))
+                .ToList();
+
+            return new BarcodeLaunchResult
+            {
+                Success = true,
+                OrderId = launch.OrderId,
+                SelectedOrderIds = selectedIds,
+                PrefillSelections = filteredPrefills,
+                SuccessMessage = launch.IsClosed
+                    ? $"Lotto chiuso {launch.LotCode} aggiunto alla selezione."
+                    : $"Lotto {launch.LotCode} aggiunto alla selezione."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new BarcodeLaunchResult { ValidationMessage = $"Non riesco a cercare il lotto indicato. {ex.Message}" };
+        }
+    }
+
+    public Screen4ViewModel BuildScreen4Model(BlazorProductionDeclarationState state, string? actionId, string? validationMessage = null, string? successMessage = null)
+    {
+        var selectedOperators = LoadSelectedOperators(state.SelectedOperatorIds);
+        var resolvedActionId = string.IsNullOrWhiteSpace(actionId) ? state.SelectedActionId : actionId;
+        if (!TryGetWorkAction(resolvedActionId, out var actionDefinition))
+        {
+            return new Screen4ViewModel
+            {
+                SelectedOperators = selectedOperators,
+                ValidationMessage = "Operazione non valida. Torna alla selezione lavorazione."
+            };
+        }
+
+        var isTimingOnlyMode = actionDefinition.FlowType == WorkFlowType.Screen4Direct;
+        var productionMode = IsTrapunteProductionAction(actionDefinition)
+            ? NormalizeProductionMode(state.ProductionMode) ?? string.Empty
+            : string.Empty;
+        var canRequestDateEdit = _declarationDateAuthorizationService.CanAnySelectedOperatorEditDate(selectedOperators.Select(static item => item.Id));
+        var isDateEditAuthorized = state.DateEditAuthorized && canRequestDateEdit;
+        var resolveMaterialLots = ShouldResolveMaterialLots(actionDefinition);
+
+        var model = new Screen4ViewModel
+        {
+            ActionId = actionDefinition.Id,
+            ActionText = actionDefinition.ActionText,
+            AreaTitle = actionDefinition.AreaTitle,
+            LineCode = actionDefinition.LineCode,
+            LineDisplayName = actionDefinition.AreaTitle,
+            ProductionMode = productionMode,
+            SelectedOperators = selectedOperators,
+            BackActionName = actionDefinition.FlowType == WorkFlowType.ProductionLaunches ? "Launches" : "WorkMenu",
+            IsTimingOnlyMode = isTimingOnlyMode,
+            RequiresMaterialLotSelection = RequiresMaterialLotSelection(actionDefinition, productionMode),
+            AvailableMaterialLots = [],
+            DeclarationDate = DateTime.Today,
+            CanRequestDateEdit = canRequestDateEdit,
+            IsDeclarationDateEditable = isDateEditAuthorized,
+            AutoFillMaxQuantityFromBarcode = state.AutoFillMaxQuantityFromBarcode,
+            ValidationMessage = validationMessage,
+            SuccessMessage = successMessage
+        };
+
+        if (IsGenericDeclarationAction(actionDefinition))
+        {
+            try
+            {
+                model.AvailableNoteTypes = _declarationNoteTypeCatalogService.GetForGenericDeclarations().ToList();
+                model.SelectedNoteTypeId = ResolveDefaultOtherNoteType(model.AvailableNoteTypes)?.Id;
+            }
+            catch (Exception ex)
+            {
+                model.AvailableNoteTypes = [];
+                model.ValidationMessage = AppendMessage(model.ValidationMessage, $"Non riesco a caricare i tipi nota da X_OE_PROD_DICH_TIPI_NOTE. {ex.Message}");
+            }
+        }
+        else if (actionDefinition.FlowType == WorkFlowType.ProductionLaunches)
+        {
+            try
+            {
+                model.AvailableNoteTypes = _declarationNoteTypeCatalogService.GetForProductionDeclarations().ToList();
+            }
+            catch (Exception ex)
+            {
+                model.AvailableNoteTypes = [];
+                model.ValidationMessage = AppendMessage(model.ValidationMessage, $"Non riesco a caricare i tipi nota da X_OE_PROD_DICH_TIPI_NOTE. {ex.Message}");
+            }
+        }
+
+        if (actionDefinition.FlowType != WorkFlowType.ProductionLaunches || state.SelectedLaunchOrderIds.Count == 0)
+        {
+            return model;
+        }
+
+        List<ProductionLaunchItemViewModel> selectedLaunches;
+        try
+        {
+            selectedLaunches = _productionLaunchService.GetLaunchesByOrderIds(actionDefinition.LineCode!, state.SelectedLaunchOrderIds, resolveMaterialLots).ToList();
+        }
+        catch (Exception ex)
+        {
+            model.ValidationMessage = AppendMessage(model.ValidationMessage, $"Non riesco a rileggere i lotti selezionati. {ex.Message}");
+            return model;
+        }
+
+        Dictionary<int, List<DeclarationHistoryItemViewModel>> historyLookup = [];
+        IReadOnlyDictionary<int, decimal> producedQuantities = new Dictionary<int, decimal>();
+        try
+        {
+            historyLookup = _productionDeclarationPersistenceService
+                .GetPreviousDeclarationsByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), state.SelectedLaunchOrderIds)
+                .GroupBy(static item => item.OrderId)
+                .ToDictionary(static group => group.Key, static group => group.ToList());
+        }
+        catch (Exception ex)
+        {
+            model.ValidationMessage = AppendMessage(model.ValidationMessage, $"Non riesco a caricare lo storico dichiarazioni. {ex.Message}");
+            try
+            {
+                producedQuantities = _productionDeclarationPersistenceService
+                    .GetProducedQuantitiesByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), state.SelectedLaunchOrderIds);
+            }
+            catch
+            {
+                producedQuantities = new Dictionary<int, decimal>();
+            }
+        }
+
+        model.SelectedLaunches = selectedLaunches
+            .Select(launch =>
+            {
+                historyLookup.TryGetValue(launch.OrderId, out var historyItems);
+                historyItems ??= [];
+                var previouslyDeclaredQuantity = historyItems.Count > 0
+                    ? historyItems.Sum(static item => item.DeclaredQuantity)
+                    : producedQuantities.TryGetValue(launch.OrderId, out var producedQuantity)
+                        ? producedQuantity
+                        : 0m;
+                var quantityProduced = launch.IsClosed
+                    ? previouslyDeclaredQuantity
+                    : launch.QuantityProduced ?? 0m;
+                var quantityToProduce = launch.IsClosed
+                    ? launch.QuantityEvadedQpr
+                    : launch.QuantityToProduce;
+                var availableMaterialLots = launch.AvailableMaterialLots.ToList();
+
+                return new Screen4SelectedLaunchViewModel
+                {
+                    OrderId = launch.OrderId,
+                    LotCode = launch.LotCode,
+                    DocumentNumber = launch.DocumentNumber,
+                    QuantityMerce = launch.QuantityMerce,
+                    QuantityToProduce = quantityToProduce,
+                    QuantityEvaded = launch.QuantityEvaded,
+                    QuantityEvadedQpr = launch.QuantityEvadedQpr,
+                    QuantityProduced = quantityProduced,
+                    QuantityDeclared = null,
+                    StatusCode = launch.StatusCode,
+                    SelectedMaterialLotCode = model.RequiresMaterialLotSelection
+                        ? ResolveSelectedOrAutoMaterialLotCode(null, availableMaterialLots)
+                        : string.Empty,
+                    ArticleCode = launch.ArticleCode,
+                    ArticleDescription = launch.ArticleDescription,
+                    AvailableMaterialLots = availableMaterialLots,
+                    MaterialLotValidationMessage = launch.MaterialLotValidationMessage,
+                    HasPreviousDeclarations = previouslyDeclaredQuantity > 0m && historyItems.Count > 0,
+                    PreviousDeclarations = historyItems
+                };
+            })
+            .ToList();
+
+        model.LineDisplayName = selectedLaunches
+            .Select(static launch => launch.LineDescription)
+            .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value))
+            ?? model.LineDisplayName;
+
+        var materialLotValidationMessage = selectedLaunches
+            .Select(static launch => launch.MaterialLotValidationMessage)
+            .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+
+        if (!string.IsNullOrWhiteSpace(materialLotValidationMessage))
+        {
+            model.ValidationMessage = AppendMessage(model.ValidationMessage, materialLotValidationMessage);
+        }
+
+        ApplyLaunchPrefillSelections(model, state.LaunchPrefillSelections);
+        model.TotalDeclared = model.SelectedLaunches.Sum(static item => item.QuantityDeclared ?? 0m);
+        return model;
+    }
+
+    public DeclarationDateAuthorizationResult AuthorizeDeclarationDateEdit(BlazorProductionDeclarationState state, string? pin)
+    {
+        var selectedOperators = LoadSelectedOperators(state.SelectedOperatorIds);
+        if (selectedOperators.Count == 0)
+        {
+            return new DeclarationDateAuthorizationResult
+            {
+                Success = false,
+                Message = "Sessione operatori non valida. Riapri il flusso."
+            };
+        }
+
+        return _declarationDateAuthorizationService.AuthorizeForDateEdit(
+            selectedOperators.Select(static item => item.Id),
+            pin);
+    }
+
+    public DeclarationSubmitResult InsertDeclarations(BlazorProductionDeclarationState state, Screen4InsertPostModel postModel)
+    {
+        var selectedOperators = LoadSelectedOperators(state.SelectedOperatorIds);
+        if (selectedOperators.Count == 0)
+        {
+            return Invalid(postModel, state, "Sessione operatori non valida. Riapri il flusso.");
+        }
+
+        if (!TryGetWorkAction(postModel.ActionId, out var actionDefinition))
+        {
+            return Invalid(postModel, state, "Operazione non valida. Torna alla selezione lavorazione.");
+        }
+
+        var declarationDate = postModel.GetDeclarationDateOrDefault(DateTime.Today);
+        if (declarationDate.Date != DateTime.Today
+            && !(state.DateEditAuthorized && _declarationDateAuthorizationService.CanAnySelectedOperatorEditDate(selectedOperators.Select(static item => item.Id))))
+        {
+            return Invalid(postModel, state, "Per modificare la data devi prima inserire un PIN valido.");
+        }
+
+        if (actionDefinition.FlowType == WorkFlowType.Screen4Direct)
+        {
+            return InsertDirectScreen4Declaration(state, postModel, selectedOperators, actionDefinition, declarationDate);
+        }
+
+        if (actionDefinition.FlowType != WorkFlowType.ProductionLaunches || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            return Invalid(postModel, state, "L'inserimento e disponibile solo per la schermata con i lotti selezionati.");
+        }
+
+        var declaredRows = postModel.GetDeclaredRows();
+        if (declaredRows.Count == 0)
+        {
+            return Invalid(postModel, state, "Inserisci almeno una qta dichiarata prima di premere Inserisci.");
+        }
+
+        var timingMinutesPerOperator = postModel.GetTimingMinutesPerOperator();
+        if (timingMinutesPerOperator <= 0)
+        {
+            return Invalid(postModel, state, "Inserisci il timing prima di premere Inserisci.");
+        }
+
+        var productionNotes = postModel.GetProblemNotes().ToList();
+        var availableProductionNoteTypes = new List<DeclarationNoteTypeViewModel>();
+        if (productionNotes.Count > 0)
+        {
+            try
+            {
+                availableProductionNoteTypes = _declarationNoteTypeCatalogService.GetForProductionDeclarations().ToList();
+            }
+            catch (Exception ex)
+            {
+                return Invalid(postModel, state, $"Non riesco a caricare i tipi nota da X_OE_PROD_DICH_TIPI_NOTE. {ex.Message}");
+            }
+        }
+
+        var normalizedProductionNotes = NormalizeProductionNotes(productionNotes, availableProductionNoteTypes, out var productionNoteValidationMessage);
+        if (!string.IsNullOrWhiteSpace(productionNoteValidationMessage))
+        {
+            return Invalid(postModel, state, productionNoteValidationMessage);
+        }
+
+        if (normalizedProductionNotes.Sum(static note => note.Minutes) >= timingMinutesPerOperator)
+        {
+            return Invalid(postModel, state, "Il timing totale deve essere maggiore della somma delle note produzione o blocchi.");
+        }
+
+        var selectedMaterialLots = postModel.GetSelectedMaterialLotByOrderId();
+        var confirmedOverLimitOrderIds = postModel.GetConfirmedOverLimitOrderIds();
+        var requiresMaterialLotSelection = RequiresMaterialLotSelection(actionDefinition, postModel.ProductionMode);
+        var availableLaunchList = _productionLaunchService
+            .GetLaunchesByOrderIds(actionDefinition.LineCode!, declaredRows.Select(static row => row.OrderId).ToList(), ShouldResolveMaterialLots(actionDefinition))
+            .ToList();
+        ApplyProducedQuantities(actionDefinition, postModel.ProductionMode, availableLaunchList);
+        var availableLaunches = availableLaunchList.ToDictionary(static item => item.OrderId);
+        var normalizedMaterialLotsByOrderId = new Dictionary<int, string>();
+
+        foreach (var declaredRow in declaredRows)
+        {
+            if (!availableLaunches.TryGetValue(declaredRow.OrderId, out var launch))
+            {
+                return Invalid(postModel, state, "Non riesco a validare uno o piu lotti selezionati.");
+            }
+
+            selectedMaterialLots.TryGetValue(declaredRow.OrderId, out var materialLotCode);
+            var normalizedMaterialLotCode = requiresMaterialLotSelection
+                ? ResolveAvailableMaterialLotCode(materialLotCode, launch.AvailableMaterialLots)
+                : string.Empty;
+            normalizedMaterialLotsByOrderId[declaredRow.OrderId] = normalizedMaterialLotCode;
+
+            var availableQuantity = Math.Max(launch.QuantityToProduce - (launch.QuantityProduced ?? 0m), 0m);
+            if (declaredRow.DeclaredQuantity > availableQuantity && !confirmedOverLimitOrderIds.Contains(declaredRow.OrderId))
+            {
+                return Invalid(postModel, state, $"La qta dichiarata per il lotto {launch.LotCode} supera la qta residua disponibile. Conferma prima l'inserimento della qta maggiore.");
+            }
+        }
+
+        var request = new ProductionDeclarationInsertRequest
+        {
+            LineCode = actionDefinition.LineCode!,
+            DeclarationDate = declarationDate,
+            TimingMinutes = timingMinutesPerOperator * selectedOperators.Count,
+            Notes = normalizedProductionNotes,
+            OperatorIds = selectedOperators.Select(static item => item.Id).ToList(),
+            PhaseCode = GetDeclarationPhaseCode(actionDefinition, postModel.ProductionMode),
+            Rows = declaredRows
+                .Select(row =>
+                {
+                    var launch = availableLaunches[row.OrderId];
+                    normalizedMaterialLotsByOrderId.TryGetValue(row.OrderId, out var normalizedMaterialLotCode);
+                    return new ProductionDeclarationInsertRowRequest
+                    {
+                        OrderId = row.OrderId,
+                        DeclaredQuantity = row.DeclaredQuantity,
+                        ArticleCode = launch.ArticleCode,
+                        SelectedMaterialLotCode = normalizedMaterialLotCode ?? string.Empty
+                    };
+                })
+                .ToList()
+        };
+
+        try
+        {
+            _productionDeclarationPersistenceService.InsertDeclaration(request);
+            return new DeclarationSubmitResult
+            {
+                Success = true,
+                ClearFlow = true,
+                Message = "Dichiarazione inserita correttamente."
+            };
+        }
+        catch (Exception ex)
+        {
+            return Invalid(postModel, state, $"Non riesco a inserire la dichiarazione. {ex.Message}");
+        }
+    }
+
+    public DeclarationSubmitResult InsertDirectDeclaration(BlazorProductionDeclarationState state, ProductionLaunchDirectInsertPostModel postModel)
+    {
+        var selectedOperators = LoadSelectedOperators(state.SelectedOperatorIds);
+        if (selectedOperators.Count == 0)
+        {
+            return new DeclarationSubmitResult { Message = "Sessione operatori non valida. Riapri il flusso." };
+        }
+
+        if (!TryGetWorkAction(postModel.ActionId, out var actionDefinition)
+            || actionDefinition.FlowType != WorkFlowType.ProductionLaunches
+            || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            return new DeclarationSubmitResult { Message = "Operazione non valida. Torna alla selezione lavorazione." };
+        }
+
+        var declaredQuantity = postModel.GetDeclaredQuantity();
+        if (!declaredQuantity.HasValue || declaredQuantity.Value <= 0)
+        {
+            return new DeclarationSubmitResult { Message = "Inserisci una qta dichiarata valida prima di confermare." };
+        }
+
+        var timingMinutesPerOperator = postModel.GetTimingMinutesPerOperator();
+        if (timingMinutesPerOperator <= 0)
+        {
+            return new DeclarationSubmitResult { Message = "Inserisci il timing prima di confermare l'inserimento diretto." };
+        }
+
+        var normalizedProductionMode = ResolveProductionMode(actionDefinition, postModel.ProductionMode, state.ProductionMode);
+        try
+        {
+            var availableLaunches = _productionLaunchService
+                .GetLaunchesByOrderIds(actionDefinition.LineCode!, [postModel.OrderId], ShouldResolveMaterialLots(actionDefinition))
+                .ToList();
+            ApplyProducedQuantities(actionDefinition, normalizedProductionMode, availableLaunches);
+            var availableLaunch = availableLaunches.FirstOrDefault();
+            if (availableLaunch is null)
+            {
+                return new DeclarationSubmitResult { Message = "Non riesco a rileggere il lotto selezionato." };
+            }
+
+            var normalizedMaterialLotCode = RequiresMaterialLotSelection(actionDefinition, normalizedProductionMode)
+                ? ResolveAvailableMaterialLotCode(postModel.SelectedMaterialLotCode, availableLaunch.AvailableMaterialLots)
+                : string.Empty;
+            var availableQuantity = Math.Max(availableLaunch.QuantityToProduce - (availableLaunch.QuantityProduced ?? 0m), 0m);
+            if (declaredQuantity.Value > availableQuantity && !postModel.ConfirmOverLimit)
+            {
+                return new DeclarationSubmitResult { Message = $"La qta dichiarata per il lotto {availableLaunch.LotCode} supera la qta residua disponibile. Conferma prima l'inserimento della qta maggiore." };
+            }
+
+            var request = new ProductionDeclarationInsertRequest
+            {
+                LineCode = actionDefinition.LineCode!,
+                DeclarationDate = DateTime.Today,
+                TimingMinutes = timingMinutesPerOperator * selectedOperators.Count,
+                AnomalyDescription = null,
+                AnomalyMinutes = 0,
+                OperatorIds = selectedOperators.Select(static item => item.Id).ToList(),
+                PhaseCode = GetDeclarationPhaseCode(actionDefinition, normalizedProductionMode),
+                Rows =
+                [
+                    new ProductionDeclarationInsertRowRequest
+                    {
+                        OrderId = availableLaunch.OrderId,
+                        DeclaredQuantity = declaredQuantity.Value,
+                        ArticleCode = availableLaunch.ArticleCode,
+                        SelectedMaterialLotCode = normalizedMaterialLotCode
+                    }
+                ]
+            };
+
+            _productionDeclarationPersistenceService.InsertDeclaration(request);
+            return new DeclarationSubmitResult
+            {
+                Success = true,
+                Message = $"Dichiarazione inserita correttamente per il lotto {availableLaunch.LotCode}."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new DeclarationSubmitResult { Message = $"Non riesco a inserire la dichiarazione. {ex.Message}" };
+        }
+    }
+
+    private DeclarationSubmitResult InsertDirectScreen4Declaration(
+        BlazorProductionDeclarationState state,
+        Screen4InsertPostModel postModel,
+        IReadOnlyList<OperatorItemViewModel> selectedOperators,
+        ProductionWorkActionDefinition actionDefinition,
+        DateTime declarationDate)
+    {
+        var timingMinutesPerOperatorDirect = postModel.GetTimingMinutesPerOperator();
+        if (timingMinutesPerOperatorDirect <= 0)
+        {
+            return Invalid(postModel, state, "Inserisci il timing prima di premere Inserisci.");
+        }
+
+        DeclarationNoteTypeViewModel? selectedNoteType = null;
+        if (IsGenericDeclarationAction(actionDefinition))
+        {
+            selectedNoteType = ResolveSelectedNoteType(state, postModel, requireSelection: true, defaultToOther: true, out var noteValidationMessage);
+            if (selectedNoteType is null)
+            {
+                return Invalid(postModel, state, noteValidationMessage);
+            }
+
+            if (selectedNoteType.RequiresAnnotationText && string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription))
+            {
+                return Invalid(postModel, state, "Inserisci il testo annotazione per la tipologia selezionata.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            var directRequest = new ProductionDeclarationInsertRequest
+            {
+                LineCode = actionDefinition.LineCode!,
+                DeclarationDate = declarationDate,
+                TimingMinutes = timingMinutesPerOperatorDirect * selectedOperators.Count,
+                NoteTypeId = selectedNoteType?.Id,
+                NoteMinutes = timingMinutesPerOperatorDirect * selectedOperators.Count,
+                NoteDescription = selectedNoteType?.RequiresAnnotationText != true || string.IsNullOrWhiteSpace(postModel.GlobalProblemDescription)
+                    ? null
+                    : postModel.GlobalProblemDescription.Trim(),
+                OperatorIds = selectedOperators.Select(static item => item.Id).ToList()
+            };
+
+            try
+            {
+                _productionDeclarationPersistenceService.InsertDirectDeclaration(directRequest);
+            }
+            catch (Exception ex)
+            {
+                return Invalid(postModel, state, $"Non riesco a inserire l'operazione. {ex.Message}");
+            }
+        }
+
+        return new DeclarationSubmitResult
+        {
+            Success = true,
+            ClearFlow = true,
+            Message = "Operazione inserita correttamente."
+        };
+    }
+
+    private DeclarationSubmitResult Invalid(Screen4InsertPostModel postModel, BlazorProductionDeclarationState state, string validationMessage)
+    {
+        var model = BuildScreen4Model(state, postModel.ActionId);
+        ApplyPostedValues(model, postModel);
+        model.ValidationMessage = validationMessage;
+        return new DeclarationSubmitResult
+        {
+            Success = false,
+            Message = validationMessage,
+            InvalidModel = model
+        };
+    }
+
+    private List<OperatorItemViewModel> LoadSelectedOperators(IEnumerable<int> selectedIds)
+    {
+        try
+        {
+            var ids = selectedIds
+                .Where(static value => value > 0)
+                .Distinct()
+                .OrderBy(static value => value)
+                .ToList();
+
+            return ids.Count == 0 ? [] : _operatorCatalogService.GetByIds(ids).ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private string? ResolveProductionMode(ProductionWorkActionDefinition actionDefinition, string? rawProductionMode, string? currentProductionMode)
+    {
+        if (!IsTrapunteProductionAction(actionDefinition))
+        {
+            return null;
+        }
+
+        return NormalizeProductionMode(rawProductionMode) ?? NormalizeProductionMode(currentProductionMode);
+    }
+
+    private void ApplyProducedQuantities(ProductionWorkActionDefinition actionDefinition, string? productionMode, IList<ProductionLaunchItemViewModel> launches)
+    {
+        if (launches.Count == 0 || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            return;
+        }
+
+        var producedByOrderId = _productionDeclarationPersistenceService
+            .GetProducedQuantitiesByOrderIds(actionDefinition.LineCode!, GetDeclarationPhaseCode(actionDefinition, productionMode), launches.Select(static item => item.OrderId).ToList());
+
+        foreach (var launch in launches)
+        {
+            if (!launch.IsClosed)
+            {
+                continue;
+            }
+
+            launch.QuantityToProduce = launch.QuantityEvadedQpr;
+            launch.QuantityProduced = producedByOrderId.TryGetValue(launch.OrderId, out var producedQuantity)
+                ? producedQuantity
+                : 0m;
+        }
+    }
+
+    private List<ProductionLaunchItemViewModel> LoadLaunchesForSelection(
+        ProductionWorkActionDefinition actionDefinition,
+        string? productionMode,
+        IReadOnlyCollection<int> selectedOrderIds,
+        bool resolveMaterialLots)
+    {
+        var launches = _productionLaunchService.GetOpenLaunches(actionDefinition.LineCode!, resolveMaterialLots).ToList();
+        if (selectedOrderIds.Count > 0)
+        {
+            var existingOrderIds = launches.Select(static launch => launch.OrderId).ToHashSet();
+            var selectedLaunches = _productionLaunchService.GetLaunchesByOrderIds(actionDefinition.LineCode!, selectedOrderIds.ToList(), resolveMaterialLots);
+            foreach (var selectedLaunch in selectedLaunches)
+            {
+                if (existingOrderIds.Add(selectedLaunch.OrderId))
+                {
+                    launches.Add(selectedLaunch);
+                }
+            }
+        }
+
+        var orderedLaunches = launches
+            .OrderBy(static launch => launch.LotCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static launch => launch.OrderId)
+            .ToList();
+        ApplyProducedQuantities(actionDefinition, productionMode, orderedLaunches);
+        return orderedLaunches;
+    }
+
+    private IReadOnlyList<ProductionLaunchItemViewModel> ResolveLaunchesFromBarcode(string lineCode, string rawBarcode, bool resolveMaterialLots)
+    {
+        var orderId = ExtractOrderIdFromBarcode(rawBarcode);
+        if (orderId.HasValue)
+        {
+            return _productionLaunchService.GetLaunchesByOrderIds(lineCode, [orderId.Value], resolveMaterialLots);
+        }
+
+        var lotCode = ExtractLotCodeFromBarcode(rawBarcode) ?? NormalizeBarcodeValue(rawBarcode);
+        return string.IsNullOrWhiteSpace(lotCode)
+            ? []
+            : _productionLaunchService.FindLaunchesByLotCode(lineCode, lotCode, resolveMaterialLots);
+    }
+
+    private static int? ExtractOrderIdFromBarcode(string? rawValue)
+    {
+        var sourceValue = (rawValue ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(sourceValue))
+        {
+            return null;
+        }
+
+        var upperValue = sourceValue.ToUpperInvariant();
+        if (upperValue.EndsWith("//LOTTO", StringComparison.Ordinal) && !upperValue.Contains("LOTTO=", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var markerIndex = upperValue.IndexOf("//LOTTO", StringComparison.Ordinal);
+        if (markerIndex < 0)
+        {
+            return null;
+        }
+
+        var prefixSegments = sourceValue[..markerIndex]
+            .Trim()
+            .Split("//", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (prefixSegments.Length == 0)
+        {
+            return null;
+        }
+
+        var lastSegment = prefixSegments[^1];
+        var equalsIndex = lastSegment.LastIndexOf('=');
+        var candidateValue = equalsIndex >= 0
+            ? lastSegment[(equalsIndex + 1)..].Trim()
+            : lastSegment.Trim();
+
+        if (int.TryParse(candidateValue, out var directOrderId))
+        {
+            return directOrderId;
+        }
+
+        var digitsMatch = Regex.Match(candidateValue, @"\d+");
+        return digitsMatch.Success && int.TryParse(digitsMatch.Value, out var parsedOrderId)
+            ? parsedOrderId
+            : null;
+    }
+
+    private static string? ExtractLotCodeFromBarcode(string? rawValue)
+    {
+        var sourceValue = (rawValue ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(sourceValue))
+        {
+            return null;
+        }
+
+        var lotMatch = Regex.Match(sourceValue, @"(?:^|//)LOTTO=([^/]+)", RegexOptions.IgnoreCase);
+        if (lotMatch.Success && lotMatch.Groups[1].Success)
+        {
+            return NormalizeBarcodeValue(lotMatch.Groups[1].Value);
+        }
+
+        const string trailingMarker = "//LOTTO";
+        if (!sourceValue.ToUpperInvariant().EndsWith(trailingMarker, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var prefixValue = sourceValue[..^trailingMarker.Length].Trim();
+        var prefixSegments = prefixValue.Split("//", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (prefixSegments.Length == 0)
+        {
+            return null;
+        }
+
+        var lastSegment = prefixSegments[^1];
+        var equalsIndex = lastSegment.LastIndexOf('=');
+        var candidateValue = equalsIndex >= 0
+            ? lastSegment[(equalsIndex + 1)..].Trim()
+            : lastSegment.Trim();
+
+        return string.IsNullOrWhiteSpace(candidateValue)
+            ? null
+            : NormalizeBarcodeValue(candidateValue);
+    }
+
+    private static string NormalizeBarcodeValue(string? value)
+    {
+        return new string((value ?? string.Empty)
+                .Where(static character => !char.IsWhiteSpace(character))
+                .ToArray())
+            .ToUpperInvariant();
+    }
+
+    private static void ApplyPostedValues(Screen4ViewModel model, Screen4InsertPostModel postModel)
+    {
+        var declaredQuantities = postModel.GetDeclaredQuantityByOrderId();
+        var selectedMaterialLots = postModel.GetSelectedMaterialLotByOrderId();
+        foreach (var launch in model.SelectedLaunches)
+        {
+            if (declaredQuantities.TryGetValue(launch.OrderId, out var declaredQuantity))
+            {
+                launch.QuantityDeclared = declaredQuantity;
+            }
+
+            if (selectedMaterialLots.TryGetValue(launch.OrderId, out var materialLotCode))
+            {
+                launch.SelectedMaterialLotCode = model.RequiresMaterialLotSelection
+                    ? ResolveSelectedOrAutoMaterialLotCode(materialLotCode, launch.AvailableMaterialLots)
+                    : string.Empty;
+            }
+        }
+
+        model.TotalDeclared = model.SelectedLaunches.Sum(static item => item.QuantityDeclared ?? 0m);
+        model.GlobalTimingHours = Math.Max(0, postModel.GlobalTimingHours);
+        model.GlobalTimingMinutes = Math.Max(0, postModel.GlobalTimingMinutes);
+        model.SelectedNoteTypeId = postModel.SelectedNoteTypeId;
+        model.GlobalProblemDescription = postModel.GlobalProblemDescription ?? string.Empty;
+        model.GlobalProblemHours = Math.Max(0, postModel.GlobalProblemHours);
+        model.GlobalProblemMinutes = Math.Max(0, postModel.GlobalProblemMinutes);
+        model.ProblemNotesJson = string.IsNullOrWhiteSpace(postModel.ProblemNotesJson) ? "[]" : postModel.ProblemNotesJson;
+        model.DeclarationDate = postModel.GetDeclarationDateOrDefault(model.DeclarationDate);
+        model.ProductionMode = postModel.ProductionMode ?? string.Empty;
+        model.ConfirmedOverLimitOrderIds = postModel.ConfirmedOverLimitOrderIds ?? string.Empty;
+        model.ConfirmedMissingMaterialLotOrderIds = postModel.ConfirmedMissingMaterialLotOrderIds ?? string.Empty;
+    }
+
+    private static void ApplyLaunchPrefillSelections(Screen4ViewModel model, IReadOnlyList<ProductionLaunchPrefillSelectionItem> prefilledSelections)
+    {
+        if (prefilledSelections.Count == 0 || model.SelectedLaunches.Count == 0)
+        {
+            return;
+        }
+
+        var selectionLookup = prefilledSelections
+            .Where(static item => item.OrderId > 0)
+            .GroupBy(static item => item.OrderId)
+            .ToDictionary(static group => group.Key, static group => group.Last());
+
+        foreach (var launch in model.SelectedLaunches)
+        {
+            if (!selectionLookup.TryGetValue(launch.OrderId, out var selection))
+            {
+                continue;
+            }
+
+            var declaredQuantity = selection.GetDeclaredQuantity();
+            if (declaredQuantity.HasValue && declaredQuantity.Value > 0)
+            {
+                launch.QuantityDeclared = declaredQuantity.Value;
+            }
+
+            launch.SelectedMaterialLotCode = model.RequiresMaterialLotSelection
+                ? ResolveSelectedOrAutoMaterialLotCode(selection.SelectedMaterialLotCode, launch.AvailableMaterialLots)
+                : string.Empty;
+        }
+    }
+
+    private static string SerializeLaunchPrefillSelections(IEnumerable<ProductionLaunchPrefillSelectionItem> items)
+    {
+        return JsonSerializer.Serialize(items
+            .Where(static item => item.OrderId > 0)
+            .Select(item => new ProductionLaunchPrefillSelectionItem
+            {
+                OrderId = item.OrderId,
+                QuantityDeclared = item.QuantityDeclared ?? string.Empty,
+                SelectedMaterialLotCode = NormalizeMaterialLotCode(item.SelectedMaterialLotCode)
+            }), new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+    }
+
+    private static string NormalizeMaterialLotCode(string? materialLotCode)
+    {
+        return (materialLotCode ?? string.Empty).Trim();
+    }
+
+    private static string ResolveAvailableMaterialLotCode(string? materialLotCode, IReadOnlyCollection<string>? availableMaterialLots)
+    {
+        var normalizedValue = NormalizeMaterialLotCode(materialLotCode);
+        if (string.IsNullOrWhiteSpace(normalizedValue) || availableMaterialLots is null || availableMaterialLots.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return availableMaterialLots.FirstOrDefault(value => string.Equals(value, normalizedValue, StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+    }
+
+    private static string ResolveSelectedOrAutoMaterialLotCode(string? materialLotCode, IReadOnlyCollection<string>? availableMaterialLots)
+    {
+        var resolvedValue = ResolveAvailableMaterialLotCode(materialLotCode, availableMaterialLots);
+        if (!string.IsNullOrWhiteSpace(resolvedValue))
+        {
+            return resolvedValue;
+        }
+
+        return availableMaterialLots is { Count: 1 }
+            ? NormalizeMaterialLotCode(availableMaterialLots.First())
+            : string.Empty;
+    }
+
+    private ProductionLaunchSelectionViewModel BuildLaunchesViewModel(
+        ProductionWorkActionDefinition actionDefinition,
+        string? productionMode,
+        List<OperatorItemViewModel> selectedOperators,
+        List<ProductionLaunchItemViewModel> launches,
+        IReadOnlyCollection<int> selectedOrderIds,
+        bool autoInsertOnBarcodeEnabled,
+        string prefilledSelectionsJson,
+        string? validationMessage,
+        string? successMessage)
+    {
+        return new ProductionLaunchSelectionViewModel
+        {
+            ActionId = actionDefinition.Id,
+            ActionText = actionDefinition.ActionText,
+            AreaTitle = actionDefinition.AreaTitle,
+            LineCode = actionDefinition.LineCode ?? string.Empty,
+            LineDisplayName = launches.Select(static launch => launch.LineDescription).FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value)) ?? actionDefinition.AreaTitle,
+            ProductionMode = productionMode ?? string.Empty,
+            SelectedOperators = selectedOperators,
+            Launches = launches,
+            SelectedOrderIds = string.Join(',', selectedOrderIds.OrderBy(static value => value)),
+            AutoInsertOnBarcodeEnabled = autoInsertOnBarcodeEnabled,
+            RequiresMaterialLotSelection = RequiresMaterialLotSelection(actionDefinition, productionMode),
+            AvailableMaterialLots = [],
+            PrefilledSelectionsJson = prefilledSelectionsJson,
+            ValidationMessage = validationMessage,
+            SuccessMessage = successMessage
+        };
+    }
+
+    private DeclarationNoteTypeViewModel? ResolveSelectedNoteType(
+        BlazorProductionDeclarationState state,
+        Screen4InsertPostModel postModel,
+        bool requireSelection,
+        bool defaultToOther,
+        out string validationMessage)
+    {
+        validationMessage = string.Empty;
+        var model = BuildScreen4Model(state, postModel.ActionId);
+        var noteTypes = model.AvailableNoteTypes;
+        if (noteTypes.Count == 0)
+        {
+            validationMessage = model.ValidationMessage
+                ?? "Non ci sono tipi nota disponibili nella tabella X_OE_PROD_DICH_TIPI_NOTE.";
+            return null;
+        }
+
+        var selectedNoteTypeId = postModel.SelectedNoteTypeId;
+        if ((!selectedNoteTypeId.HasValue || selectedNoteTypeId.Value <= 0) && defaultToOther)
+        {
+            selectedNoteTypeId = ResolveDefaultOtherNoteType(noteTypes)?.Id;
+        }
+
+        if (!selectedNoteTypeId.HasValue || selectedNoteTypeId.Value <= 0)
+        {
+            if (requireSelection)
+            {
+                validationMessage = "Seleziona un tipo nota prima di premere Inserisci.";
+            }
+
+            return null;
+        }
+
+        var selectedNoteType = noteTypes.FirstOrDefault(item => item.Id == selectedNoteTypeId.Value);
+        if (selectedNoteType is null)
+        {
+            validationMessage = "Il tipo nota selezionato non e presente nella tabella X_OE_PROD_DICH_TIPI_NOTE.";
+            return null;
+        }
+
+        return selectedNoteType;
+    }
+
+    private static DeclarationNoteTypeViewModel? ResolveDefaultOtherNoteType(IReadOnlyList<DeclarationNoteTypeViewModel> noteTypes)
+    {
+        return noteTypes.FirstOrDefault(static item => string.Equals(item.Description.Trim(), "Altro", StringComparison.OrdinalIgnoreCase))
+            ?? noteTypes.FirstOrDefault();
+    }
+
+    private static IReadOnlyList<ProductionDeclarationNoteRequest> NormalizeProductionNotes(
+        IReadOnlyList<Screen4ProblemNotePostItemModel> postedNotes,
+        IReadOnlyList<DeclarationNoteTypeViewModel> availableNoteTypes,
+        out string validationMessage)
+    {
+        validationMessage = string.Empty;
+        if (postedNotes.Count == 0)
+        {
+            return [];
+        }
+
+        var noteTypeLookup = availableNoteTypes.ToDictionary(static item => item.Id);
+        var normalizedNotes = new List<ProductionDeclarationNoteRequest>();
+        foreach (var note in postedNotes)
+        {
+            if (!noteTypeLookup.TryGetValue(note.NoteTypeId, out var noteType))
+            {
+                validationMessage = "Il tipo nota selezionato non e presente nella tabella X_OE_PROD_DICH_TIPI_NOTE.";
+                return [];
+            }
+
+            if (note.TotalMinutes <= 0)
+            {
+                validationMessage = "Inserisci il timing per ogni blocco o anomalia.";
+                return [];
+            }
+
+            var normalizedDescription = note.Description?.Trim();
+            if (noteType.RequiresAnnotationText && string.IsNullOrWhiteSpace(normalizedDescription))
+            {
+                validationMessage = "Inserisci la descrizione per ogni tipologia che richiede annotazione.";
+                return [];
+            }
+
+            normalizedNotes.Add(new ProductionDeclarationNoteRequest
+            {
+                NoteTypeId = note.NoteTypeId,
+                Minutes = note.TotalMinutes,
+                Description = string.IsNullOrWhiteSpace(normalizedDescription) ? null : normalizedDescription
+            });
+        }
+
+        return normalizedNotes
+            .GroupBy(static item => item.NoteTypeId)
+            .Select(static group => new ProductionDeclarationNoteRequest
+            {
+                NoteTypeId = group.Key,
+                Minutes = group.Sum(static item => item.Minutes),
+                Description = JoinDescriptions(group.Select(static item => item.Description))
+            })
+            .ToList();
+    }
+
+    private static string? JoinDescriptions(IEnumerable<string?> descriptions)
+    {
+        var normalizedDescriptions = descriptions
+            .Select(static value => value?.Trim())
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return normalizedDescriptions.Count == 0
+            ? null
+            : string.Join("; ", normalizedDescriptions);
+    }
+
+    private static string? AppendMessage(string? currentMessage, string? nextMessage)
+    {
+        if (string.IsNullOrWhiteSpace(currentMessage))
+        {
+            return nextMessage;
+        }
+
+        return string.IsNullOrWhiteSpace(nextMessage)
+            ? currentMessage
+            : $"{currentMessage} {nextMessage}";
+    }
+
+    private static bool IsTrapunteProductionAction(ProductionWorkActionDefinition actionDefinition)
+    {
+        return string.Equals(actionDefinition.Id, "trapunte-dichiarazione-produzione", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldResolveMaterialLots(ProductionWorkActionDefinition actionDefinition)
+    {
+        return actionDefinition.FlowType == WorkFlowType.ProductionLaunches;
+    }
+
+    public static class WorkFlowType
+    {
+        public const string ProductionLaunches = "production-launches";
+        public const string Screen4Direct = "screen4-direct";
+    }
+
+    private static class ProductionModes
+    {
+        public const string Riempimento = "riempimento";
+        public const string Macchina = "macchina";
+    }
+}
