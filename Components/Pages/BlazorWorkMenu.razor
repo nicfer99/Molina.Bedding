@@ -56,7 +56,10 @@
                                         data-action-icon="@action.Icon"
                                         data-action-tone="@action.Tone"
                                         @onclick="() => OpenActionAsync(action.Id)">
-                                    @action.Text
+                                    <span class="dx-button-content">
+                                        <span class="@GetActionIconClass(action.Icon)" aria-hidden="true"></span>
+                                        <span class="dx-button-text">@action.Text</span>
+                                    </span>
                                 </button>
                             </div>
                         }
@@ -162,5 +165,12 @@
     private void CloseTrapunteModeModal()
     {
         ShowTrapunteModeModal = false;
+    }
+
+    private static string GetActionIconClass(string? icon)
+    {
+        return string.IsNullOrWhiteSpace(icon)
+            ? "dx-icon dx-icon-arrowright"
+            : $"dx-icon dx-icon-{icon}";
     }
 }

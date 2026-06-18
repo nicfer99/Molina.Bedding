@@ -20,6 +20,16 @@
     height: 6px;
 }
 
+.work-area-actions .dx-action-button > .dx-button-content {
+    min-height: 100%;
+    width: 100%;
+}
+
+.work-area-actions .dx-action-button .dx-icon {
+    flex: 0 0 auto;
+    font-size: 1.45rem;
+}
+
 .work-area-actions .dx-action-button:hover,
 .work-area-actions .dx-action-button:focus-visible {
     outline: none;
