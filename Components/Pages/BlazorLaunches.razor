@@ -90,7 +90,7 @@
                              data-material-lots-base64="@launchMaterialLotsBase64"
                              data-material-lot-error="@(launch.MaterialLotValidationMessage ?? string.Empty)"
                              aria-pressed="@(isSelected ? "true" : "false")"
-                             @onclick="() => ToggleLaunchAsync(launch)">
+                             @onclick="HandleLaunchCardClickAsync">
                         <button type="button"
                                 class="launch-card-remove"
                                 data-order-id="@launch.OrderId"
@@ -381,22 +381,17 @@
             + (launch.IsClosed ? " is-closed" : string.Empty);
     }
 
-    private async Task ToggleLaunchAsync(ProductionLaunchItemViewModel launch)
-    {
-        if (!SelectedOrderIds.Add(launch.OrderId))
-        {
-            SelectedOrderIds.Remove(launch.OrderId);
-            PrefillSelections.Remove(launch.OrderId);
-        }
-
-        await PersistSelectionAsync(false);
-    }
-
     private async Task RemoveLaunchAsync(int orderId)
     {
         SelectedOrderIds.Remove(orderId);
         PrefillSelections.Remove(orderId);
         await PersistSelectionAsync(false);
+    }
+
+    private async Task HandleLaunchCardClickAsync()
+    {
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Per selezionare il lotto usa sempre barcode o incolla.", "info");
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
     }
 
     private async Task PersistSelectionAsync(bool autoFillMax)
@@ -414,6 +409,7 @@
     {
         AutoInsertOnBarcode = args.Value is bool value && value;
         await FlowState.SetAutoInsertAsync(AutoInsertOnBarcode);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
     }
 
     private async Task HandleBarcodeKeydownAsync(KeyboardEventArgs args)
@@ -489,7 +485,6 @@
             return false;
         }
 
-        BarcodeValue = string.Empty;
         if (matchingLaunches.Count > 1)
         {
             await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Ho trovato pi\u00f9 lotti compatibili. Controlla il barcode e riprova.", "warning");
@@ -497,6 +492,7 @@
             return true;
         }
 
+        BarcodeValue = string.Empty;
         var launch = matchingLaunches[0];
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.scrollLaunchCardIntoView", launch.OrderId);
 
