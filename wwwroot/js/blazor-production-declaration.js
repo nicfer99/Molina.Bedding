@@ -82,11 +82,22 @@
         });
     }
 
+    function isAnySelectorPresent(selectors) {
+        if (!selectors) {
+            return false;
+        }
+
+        return selectors.some(function (selector) {
+            return !!selector && !!document.querySelector(selector);
+        });
+    }
+
     window.molinaBlazorBarcode = {
-        activate: function (inputId, blockedSelectors) {
+        activate: function (inputId, blockedSelectors, dotNetReference) {
             var state = window.__molinaBlazorBarcodeState || {};
             state.inputId = inputId;
             state.blockedSelectors = Array.isArray(blockedSelectors) ? blockedSelectors : [];
+            state.dotNetReference = dotNetReference || null;
 
             if (!state.bound) {
                 state.bound = true;
@@ -150,9 +161,44 @@
                         state.focusBarcode(false);
                     }
                 });
+
+                document.addEventListener("paste", function (event) {
+                    var input = document.getElementById(state.inputId);
+                    if (!input || isAnySelectorPresent(state.blockedSelectors)) {
+                        return;
+                    }
+
+                    var pastedText = event.clipboardData ? event.clipboardData.getData("text") : "";
+                    if (!pastedText) {
+                        return;
+                    }
+
+                    var activeElement = document.activeElement;
+                    if (isEditableElement(activeElement) && activeElement !== input) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    input.value = pastedText;
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+                    if (state.dotNetReference && typeof state.dotNetReference.invokeMethodAsync === "function") {
+                        state.dotNetReference.invokeMethodAsync("ProcessBarcodePasteAsync", pastedText);
+                    }
+                });
             }
 
             window.__molinaBlazorBarcodeState = state;
+        },
+        deactivate: function (dotNetReference) {
+            var state = window.__molinaBlazorBarcodeState;
+            if (!state) {
+                return;
+            }
+
+            if (!dotNetReference || state.dotNetReference === dotNetReference) {
+                state.dotNetReference = null;
+            }
         }
     };
 

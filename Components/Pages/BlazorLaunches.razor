@@ -1,4 +1,5 @@
 @page "/blazor/launches/{ActionId}"
+@implements IAsyncDisposable
 @inject NavigationManager Navigation
 @inject BlazorProductionDeclarationState FlowState
 @inject IProductionDeclarationFlowService FlowService
@@ -285,6 +286,7 @@
     private string DirectPartialQuantity { get; set; } = string.Empty;
     private string DirectMaterialLotCode { get; set; } = string.Empty;
     private bool ShowDirectPartialModal { get; set; }
+    private DotNetObjectReference<BlazorLaunches>? BarcodeReference { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -310,10 +312,12 @@
         }
 
         await LoadModelAsync(null, null);
+        BarcodeReference = DotNetObjectReference.Create(this);
         await JsRuntime.InvokeVoidAsync(
             "molinaBlazorBarcode.activate",
             "lotBarcode",
-            new[] { "#launchDirectInsertModal", "#launchDirectPartialQuantityModal" });
+            new[] { "#launchDirectInsertModal", "#launchDirectPartialQuantityModal" },
+            BarcodeReference);
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
         StateHasChanged();
     }
@@ -448,6 +452,14 @@
         await PersistSelectionAsync(false);
         await LoadModelAsync(null, result.SuccessMessage);
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+    }
+
+    [JSInvokable(nameof(ProcessBarcodePasteAsync))]
+    public async Task ProcessBarcodePasteAsync(string? rawBarcode)
+    {
+        BarcodeValue = rawBarcode ?? string.Empty;
+        await AddBarcodeAsync();
+        StateHasChanged();
     }
 
     private async Task<bool> TryHandleLoadedBarcodeAsync(string rawBarcode)
@@ -761,4 +773,19 @@
             : null;
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        if (BarcodeReference is not null)
+        {
+            try
+            {
+                await JsRuntime.InvokeVoidAsync("molinaBlazorBarcode.deactivate", BarcodeReference);
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+
+            BarcodeReference.Dispose();
+        }
+    }
 }
