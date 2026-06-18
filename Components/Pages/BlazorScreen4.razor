@@ -324,7 +324,7 @@
             </div>
 
             <div class="form-footer form-footer--split">
-                <button type="button" class="secondary-action-link" @onclick="GoBack">Indietro</button>
+                <a href="@GetBackUrl()" class="secondary-action-link">Indietro</a>
                 @if (Model.SelectedLaunches.Count > 0 || Model.IsTimingOnlyMode)
                 {
                     <button type="button"
@@ -441,8 +441,8 @@
                     <div class="page-kicker">Lotto</div>
                     <h2 id="screen4MaterialLotModalTitle">Inserisci il lotto</h2>
                     <div class="material-lot-article-summary" data-material-lot-article-summary="true">
-                        <span data-material-lot-article-code="true">@(ActiveMaterialLotLaunch?.ArticleCode ?? string.Empty)</span>
-                        <strong data-material-lot-article-description="true">@(ActiveMaterialLotLaunch?.ArticleDescription ?? string.Empty)</strong>
+                        <span data-material-lot-article-code="true">@(ActiveMaterialLotLaunch?.ArticleCode ?? "-")</span>
+                        <strong data-material-lot-article-description="true">@(ActiveMaterialLotLaunch?.ArticleDescription ?? "-")</strong>
                     </div>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" data-close-material-lot-modal="true" @onclick="CloseMaterialLotModal" aria-label="Chiudi finestra">×</button>
@@ -1423,18 +1423,17 @@
         };
     }
 
-    private void GoBack()
+    private string GetBackUrl()
     {
         if (Model?.BackActionName == "Launches")
         {
             var productionModeQuery = string.IsNullOrWhiteSpace(Model.ProductionMode)
                 ? string.Empty
                 : $"?productionMode={Uri.EscapeDataString(Model.ProductionMode)}";
-            Navigation.NavigateTo($"/blazor/launches/{Model.ActionId}{productionModeQuery}");
-            return;
+            return $"/blazor/launches/{Uri.EscapeDataString(Model.ActionId)}{productionModeQuery}";
         }
 
-        Navigation.NavigateTo("/blazor/work-menu");
+        return "/blazor/work-menu";
     }
 
     private static string FormatTime(int hours, int minutes)
