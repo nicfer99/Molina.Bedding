@@ -334,7 +334,22 @@
             return;
         }
 
+        if (!FlowService.TryGetWorkAction(ActionId, out var actionDefinition)
+            || !FlowService.IsProductionLaunchAction(actionDefinition)
+            || string.IsNullOrWhiteSpace(actionDefinition.LineCode))
+        {
+            Navigation.NavigateTo("/blazor/work-menu");
+            return;
+        }
+
         var normalizedMode = FlowService.NormalizeProductionMode(ProductionMode) ?? FlowState.ProductionMode;
+        if (string.Equals(actionDefinition.Id, "trapunte-dichiarazione-produzione", StringComparison.Ordinal)
+            && string.IsNullOrWhiteSpace(normalizedMode))
+        {
+            Navigation.NavigateTo("/blazor/work-menu");
+            return;
+        }
+
         if (!string.Equals(FlowState.SelectedActionId, ActionId, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(FlowState.ProductionMode, normalizedMode, StringComparison.OrdinalIgnoreCase))
         {
