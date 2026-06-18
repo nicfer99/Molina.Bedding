@@ -20,8 +20,14 @@
     </div>
 </section>
 
+@if (!string.IsNullOrWhiteSpace(StartSuccessMessage))
+{
+    <div data-start-success-message="@StartSuccessMessage"></div>
+}
+
 @code {
     private bool _initialized;
+    private string? StartSuccessMessage { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -35,6 +41,7 @@
         var message = FlowState.StartSuccessMessage;
         if (!string.IsNullOrWhiteSpace(message))
         {
+            StartSuccessMessage = message;
             await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.success", message, "Inserimento completato");
             await FlowState.ConsumeStartSuccessMessageAsync();
         }

@@ -44,7 +44,7 @@
     }
     else
     {
-        <div id="launchSelectionForm">
+        <div id="launchSelectionForm" data-add-launch-from-barcode-url="">
             <div class="barcode-panel">
                 <label for="lotBarcode" class="barcode-label">Barcode lotto</label>
                 <input type="text"
@@ -68,11 +68,19 @@
             <div class="launch-grid" aria-label="Lotti disponibili">
                 @foreach (var launch in Model.Launches)
                 {
+                    var producedValue = launch.QuantityProduced ?? 0m;
+                    var remainingValue = GetRemainingQuantity(launch);
+                    var launchMaterialLotsBase64 = EncodeMaterialLots(launch.AvailableMaterialLots);
                     var isSelected = SelectedOrderIds.Contains(launch.OrderId);
                     var prefill = GetPrefill(launch.OrderId);
                     <article class="@GetLaunchCardClass(launch)"
                              data-order-id="@launch.OrderId"
                              data-lot-code="@launch.LotCode"
+                             data-max-qty="@FormatQuantityInvariant(launch.QuantityToProduce)"
+                             data-produced-qty="@FormatQuantityInvariant(producedValue)"
+                             data-remaining-qty="@FormatQuantityInvariant(remainingValue)"
+                             data-material-lots-base64="@launchMaterialLotsBase64"
+                             data-material-lot-error="@(launch.MaterialLotValidationMessage ?? string.Empty)"
                              aria-pressed="@(isSelected ? "true" : "false")"
                              @onclick="() => ToggleLaunchAsync(launch)">
                         <button type="button"
@@ -113,6 +121,7 @@
                                         <span class="note-label">Lotto</span>
                                         <button type="button"
                                                 class="launch-card-direct-summary__lot-button"
+                                                data-open-launch-direct-modal="true"
                                                 aria-label="Modifica il lotto selezionato in Schermata 3"
                                                 @onclick:stopPropagation="true"
                                                 @onclick="() => OpenDirectModal(launch)">
@@ -200,7 +209,6 @@
                                     {
                                         <button type="button"
                                                 class="material-lot-reference-chip@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? " is-selected" : string.Empty)"
-                                                data-launch-direct-material-lot-reference="@materialLot"
                                                 aria-pressed="@(string.Equals(DirectMaterialLotCode, materialLot, StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                                                 @onclick="() => SetDirectMaterialLot(materialLot)">
                                             @materialLot
@@ -760,6 +768,17 @@
     private static string FormatQuantity(decimal value)
     {
         return value.ToString("0.##", CultureInfo.GetCultureInfo("it-IT"));
+    }
+
+    private static string FormatQuantityInvariant(decimal value)
+    {
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string EncodeMaterialLots(IReadOnlyCollection<string>? materialLots)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(materialLots ?? []);
+        return Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
     }
 
     private static string? GetDirectPartialKeypadValue(string key)
