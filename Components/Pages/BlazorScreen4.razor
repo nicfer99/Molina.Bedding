@@ -134,10 +134,10 @@
                                             title="Rimuovi nota produzione o blocco"
                                             @onclick="ClearProblemNotesAsync">×</button>
                                 </div>
-                                <input type="hidden" name="GlobalProblemDescription" value="@Model.GlobalProblemDescription" data-global-problem-description-hidden="true" />
-                                <input type="hidden" name="GlobalProblemHours" value="@Model.GlobalProblemHours" data-global-problem-hours-hidden="true" />
-                                <input type="hidden" name="GlobalProblemMinutes" value="@Model.GlobalProblemMinutes" data-global-problem-minutes-hidden="true" />
-                                <input type="hidden" name="ProblemNotesJson" value="@JsonSerializer.Serialize(ProblemNotes)" data-problem-notes-hidden="true" />
+                                <input type="hidden" name="GlobalProblemDescription" value="@GetGlobalProblemDescriptionValue()" data-global-problem-description-hidden="true" />
+                                <input type="hidden" name="GlobalProblemHours" value="@GetGlobalProblemHoursValue()" data-global-problem-hours-hidden="true" />
+                                <input type="hidden" name="GlobalProblemMinutes" value="@GetGlobalProblemMinutesValue()" data-global-problem-minutes-hidden="true" />
+                                <input type="hidden" name="ProblemNotesJson" value="@SerializeProblemNotes()" data-problem-notes-hidden="true" />
                                 <div class="screen4-problem-list" data-problem-notes-list="true" hidden="@(ProblemNotes.Count <= 1)">
                                     @for (var index = 0; index < ProblemNotes.Count; index++)
                                     {
@@ -1191,7 +1191,7 @@
     {
         var parts = new List<string>
         {
-            Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == note.NoteTypeId)?.Description ?? "Nota produzione/blocco"
+            GetProblemNoteTypeText(note)
         };
 
         if (!string.IsNullOrWhiteSpace(note.Description))
@@ -1205,6 +1205,60 @@
         }
 
         return string.Join(" ", parts);
+    }
+
+    private string GetProblemNoteTypeText(Screen4ProblemNotePostItemModel note)
+    {
+        return Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == note.NoteTypeId)?.Description ?? "Nota produzione/blocco";
+    }
+
+    private int GetTotalProblemMinutes()
+    {
+        return ProblemNotes.Sum(static note => note.TotalMinutes);
+    }
+
+    private string GetGlobalProblemDescriptionValue()
+    {
+        if (Model?.IsTimingOnlyMode == true)
+        {
+            return Model.GlobalProblemDescription ?? string.Empty;
+        }
+
+        return string.Join("; ", ProblemNotes
+            .Select(static note => note.Description?.Trim() ?? string.Empty)
+            .Where(static description => !string.IsNullOrWhiteSpace(description)));
+    }
+
+    private int GetGlobalProblemHoursValue()
+    {
+        if (Model?.IsTimingOnlyMode == true)
+        {
+            return Math.Max(0, Model.GlobalProblemHours);
+        }
+
+        return GetTotalProblemMinutes() / 60;
+    }
+
+    private int GetGlobalProblemMinutesValue()
+    {
+        if (Model?.IsTimingOnlyMode == true)
+        {
+            return Math.Max(0, Model.GlobalProblemMinutes);
+        }
+
+        return GetTotalProblemMinutes() % 60;
+    }
+
+    private string SerializeProblemNotes()
+    {
+        return JsonSerializer.Serialize(ProblemNotes.Select(note => new
+        {
+            noteTypeId = note.NoteTypeId,
+            noteTypeText = GetProblemNoteTypeText(note),
+            description = note.Description?.Trim() ?? string.Empty,
+            hours = Math.Max(0, note.Hours),
+            minutes = Math.Max(0, note.Minutes)
+        }));
     }
 
     private async Task RequestDateEditAsync()
@@ -1439,10 +1493,10 @@
             GlobalTimingHours = Model.GlobalTimingHours,
             GlobalTimingMinutes = Model.GlobalTimingMinutes,
             SelectedNoteTypeId = Model.SelectedNoteTypeId,
-            GlobalProblemDescription = Model.GlobalProblemDescription ?? string.Empty,
-            GlobalProblemHours = Model.GlobalProblemHours,
-            GlobalProblemMinutes = Model.GlobalProblemMinutes,
-            ProblemNotesJson = JsonSerializer.Serialize(ProblemNotes),
+            GlobalProblemDescription = GetGlobalProblemDescriptionValue(),
+            GlobalProblemHours = GetGlobalProblemHoursValue(),
+            GlobalProblemMinutes = GetGlobalProblemMinutesValue(),
+            ProblemNotesJson = SerializeProblemNotes(),
             Rows = Model.SelectedLaunches
                 .Select(static launch => new Screen4InsertRowPostItemModel
                 {
