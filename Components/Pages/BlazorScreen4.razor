@@ -81,7 +81,7 @@
                                 <span>@FormatTime(Model.GlobalTimingHours, Model.GlobalTimingMinutes)</span>
                                 @if (Model.GlobalTimingHours > 0 || Model.GlobalTimingMinutes > 0)
                                 {
-                                    <button type="button" class="screen4-summary-clear" title="Annulla timing" @onclick="ClearTiming">×</button>
+                                    <button type="button" class="screen4-summary-clear" title="Annulla timing" @onclick="ClearTimingAsync">×</button>
                                 }
                             </div>
                         </div>
@@ -110,7 +110,7 @@
                                     <span>@GetProblemSummary()</span>
                                     @if (ProblemNotes.Count > 0)
                                     {
-                                        <button type="button" class="screen4-summary-clear" title="Rimuovi note" @onclick="ClearProblemNotes">×</button>
+                                        <button type="button" class="screen4-summary-clear" title="Rimuovi note" @onclick="ClearProblemNotesAsync">×</button>
                                     }
                                 </div>
                                 @if (ProblemNotes.Count > 1)
@@ -121,7 +121,7 @@
                                             var note = ProblemNotes[index];
                                             <div class="screen4-problem-list-item">
                                                 <span>@FormatProblemNote(note)</span>
-                                                <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNote(index)">×</button>
+                                                <button type="button" class="screen4-summary-clear" @onclick="() => RemoveProblemNoteAsync(index)">×</button>
                                             </div>
                                         }
                                     </div>
@@ -168,7 +168,7 @@
                                             <td data-label="Qta dichiarata"><strong class="screen4-table-number screen4-table-number--declared">@(launch.QuantityDeclared.HasValue ? FormatQuantity(launch.QuantityDeclared.Value) : "-")</strong></td>
                                             <td data-label="Azioni">
                                                 <div class="screen4-slot-actions screen4-slot-actions--table">
-                                                    <button type="button" class="screen4-slot-button screen4-slot-button--max" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => SetMaxQuantity(launch)">Max</button>
+                                                    <button type="button" class="screen4-slot-button screen4-slot-button--max" disabled="@(GetRemainingQuantity(launch) <= 0m)" @onclick="() => SetMaxQuantityAsync(launch)">Max</button>
                                                     @if (Model.RequiresMaterialLotSelection)
                                                     {
                                                         <button type="button" class="screen4-slot-button screen4-slot-button--history" @onclick="() => OpenMaterialLotModal(launch)">Lotto</button>
@@ -183,6 +183,13 @@
                                                             @(ExpandedHistoryOrderIds.Contains(launch.OrderId) ? "Nascondi precedenti" : "Mostra precedenti")
                                                         </button>
                                                     }
+                                                    <button type="button"
+                                                            class="screen4-slot-clear screen4-slot-clear--table@(launch.QuantityDeclared.HasValue ? string.Empty : " is-hidden")"
+                                                            aria-label="Annulla dati riga"
+                                                            title="Annulla dati riga"
+                                                            @onclick="() => ClearSlotAsync(launch)">
+                                                        ×
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -195,24 +202,27 @@
                                                             <table class="screen4-history-table">
                                                                 <thead>
                                                                     <tr>
-                                                                        <th>Data</th>
-                                                                        <th>Dichiarazione</th>
-                                                                        <th>Qta</th>
-                                                                        <th>Timing</th>
+                                                                        <th>Data / ora</th>
+                                                                        <th>Qta dichiarata</th>
+                                                                        <th>Minuti lavorati</th>
                                                                         <th>Operatori</th>
-                                                                        <th>Note</th>
+                                                                        <th>Blocco / anomalia</th>
+                                                                        <th>Minuti anomalia</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
                                                                     @foreach (var history in launch.PreviousDeclarations)
                                                                     {
                                                                         <tr>
-                                                                            <td>@history.DeclarationDateTime.ToString("dd/MM/yyyy HH:mm")</td>
-                                                                            <td>@history.DeclarationId</td>
+                                                                            <td class="screen4-history-datetime" title="@history.DeclarationDateTime.ToString("dd/MM/yyyy HH:mm")">
+                                                                                <span class="screen4-history-date">@history.DeclarationDateTime.ToString("dd/MM/yyyy")</span>
+                                                                                <span class="screen4-history-time">@history.DeclarationDateTime.ToString("HH:mm")</span>
+                                                                            </td>
                                                                             <td>@FormatQuantity(history.DeclaredQuantity)</td>
-                                                                            <td>@history.WorkedMinutes min</td>
-                                                                            <td>@history.OperatorsSummary</td>
-                                                                            <td>@history.AnomalyDescription</td>
+                                                                            <td>@history.WorkedMinutes</td>
+                                                                            <td>@(!string.IsNullOrWhiteSpace(history.OperatorsSummary) ? history.OperatorsSummary : "-")</td>
+                                                                            <td>@(!string.IsNullOrWhiteSpace(history.AnomalyDescription) ? history.AnomalyDescription : "-")</td>
+                                                                            <td>@(history.AnomalyMinutes > 0 ? history.AnomalyMinutes.ToString(CultureInfo.InvariantCulture) : "-")</td>
                                                                         </tr>
                                                                     }
                                                                 </tbody>
@@ -229,29 +239,21 @@
                     </div>
                 }
 
-                @if (IsGenericDeclaration && Model.AvailableNoteTypes.Count > 0)
-                {
-                    <div class="screen4-block">
-                        <span class="note-label">Tipo nota</span>
-                        <div class="screen4-note-type-buttons" role="group">
-                            @foreach (var noteType in Model.AvailableNoteTypes)
-                            {
-                                var isSelected = Model.SelectedNoteTypeId == noteType.Id;
-                                <button type="button"
-                                        class="screen4-note-type-button@(isSelected ? " is-selected" : string.Empty)"
-                                        aria-pressed="@(isSelected ? "true" : "false")"
-                                        @onclick="() => SelectGenericNoteType(noteType.Id)">
-                                    @noteType.Description
-                                </button>
-                            }
-                        </div>
-                    </div>
-                }
             </div>
 
             <div class="form-footer form-footer--split">
                 <button type="button" class="secondary-action-link" @onclick="GoBack">Indietro</button>
-                <button type="button" id="screen4InsertButton" class="primary-action-button" @onclick="InsertAsync">Inserisci</button>
+                @if (Model.SelectedLaunches.Count > 0 || Model.IsTimingOnlyMode)
+                {
+                    <button type="button"
+                            id="screen4InsertButton"
+                            class="primary-action-button"
+                            hidden="@IsInsertButtonHidden"
+                            disabled="@IsInsertButtonDisabled"
+                            @onclick="InsertAsync">
+                        Inserisci
+                    </button>
+                }
             </div>
         </div>
     }
@@ -334,7 +336,7 @@
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearActiveQuantity">Annulla qta dichiarata</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearActiveQuantityAsync">Annulla qta dichiarata</button>
                 <div class="screen4-qty-footer-actions">
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseQuantityModal">Chiudi</button>
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmQuantityAsync">Conferma</button>
@@ -377,7 +379,7 @@
                 <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearMaterialLotChoice">Annulla lotto</button>
                 <div class="screen4-qty-footer-actions">
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseMaterialLotModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmMaterialLot">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmMaterialLotAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -404,7 +406,7 @@
                 <div class="screen4-time-section">
                     <div class="screen4-time-section__label">Ore</div>
                     <div class="screen4-time-hours-controls">
-                        <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(-1)">-1 ora</button>
+                        <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(-1)">−1 ora</button>
                         <div class="screen4-time-value-box">@Model.GlobalTimingHours</div>
                         <button type="button" class="screen4-time-adjust" @onclick="() => AdjustTimingHours(1)">+1 ora</button>
                     </div>
@@ -414,16 +416,16 @@
                     <div class="screen4-minute-options screen4-minute-options--timing">
                         @foreach (var minute in MinuteOptions)
                         {
-                            <button type="button" class="screen4-minute-option@(Model.GlobalTimingMinutes == minute ? " is-active" : string.Empty)" @onclick="() => Model.GlobalTimingMinutes = minute">@minute.ToString("00")</button>
+                            <button type="button" class="screen4-minute-option@(Model.GlobalTimingMinutes == minute ? " is-active" : string.Empty)" @onclick="() => Model.GlobalTimingMinutes = minute">@FormatMinuteOption(minute)</button>
                         }
                     </div>
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearTiming">Annulla timing</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearTimingAsync">Annulla timing</button>
                 <div class="screen4-qty-footer-actions">
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseTimingModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="CloseTimingModal">Conferma</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmTimingAsync">Conferma</button>
                 </div>
             </div>
         </div>
@@ -474,7 +476,7 @@
                 <div class="screen4-time-section">
                     <div class="screen4-time-section__label">Ore</div>
                     <div class="screen4-time-hours-controls">
-                        <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours = Math.Max(0, ProblemHours - 1)">-1 ora</button>
+                        <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours = Math.Max(0, ProblemHours - 1)">−1 ora</button>
                         <div class="screen4-time-value-box">@ProblemHours</div>
                         <button type="button" class="screen4-time-adjust" @onclick="() => ProblemHours++">+1 ora</button>
                     </div>
@@ -484,16 +486,16 @@
                     <div class="screen4-minute-options screen4-minute-options--problem">
                         @foreach (var minute in MinuteOptions)
                         {
-                            <button type="button" class="screen4-minute-option@(ProblemMinutes == minute ? " is-active" : string.Empty)" @onclick="() => ProblemMinutes = minute">@minute.ToString("00")</button>
+                            <button type="button" class="screen4-minute-option@(ProblemMinutes == minute ? " is-active" : string.Empty)" @onclick="() => ProblemMinutes = minute">@FormatMinuteOption(minute)</button>
                         }
                     </div>
                 </div>
             </div>
             <div class="screen4-qty-modal__footer">
-                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearProblemDraft">Annulla</button>
+                <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--ghost" @onclick="ClearProblemDraftAsync">Annulla</button>
                 <div class="screen4-qty-footer-actions">
                     <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--secondary" @onclick="CloseProblemModal">Chiudi</button>
-                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmProblemNote">Aggiungi</button>
+                    <button type="button" class="screen4-qty-footer-button screen4-qty-footer-button--primary" @onclick="ConfirmProblemNoteAsync">Aggiungi</button>
                 </div>
             </div>
         </div>
@@ -533,6 +535,9 @@
     private DeclarationNoteTypeViewModel? SelectedNoteType => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == Model.SelectedNoteTypeId);
     private bool SelectedNoteRequiresAnnotation => SelectedNoteType?.RequiresAnnotationText == true;
     private bool ProblemSelectedNoteRequiresAnnotation => Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == ProblemNoteTypeId)?.RequiresAnnotationText == true;
+    private int TotalTimingMinutes => Model is null ? 0 : (Model.GlobalTimingHours * 60) + Model.GlobalTimingMinutes;
+    private bool IsInsertButtonHidden => Model?.IsTimingOnlyMode == true && TotalTimingMinutes <= 0;
+    private bool IsInsertButtonDisabled => Model?.IsTimingOnlyMode != true && TotalTimingMinutes <= 0;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -650,16 +655,6 @@
         }
     }
 
-    private void SelectGenericNoteType(int noteTypeId)
-    {
-        if (Model is null)
-        {
-            return;
-        }
-
-        Model.SelectedNoteTypeId = noteTypeId;
-    }
-
     private string GetLotCellClass(Screen4SelectedLaunchViewModel launch)
     {
         var className = "screen4-table-lot-cell";
@@ -676,7 +671,7 @@
         return className;
     }
 
-    private void SetMaxQuantity(Screen4SelectedLaunchViewModel launch)
+    private async Task SetMaxQuantityAsync(Screen4SelectedLaunchViewModel launch)
     {
         launch.QuantityDeclared = GetRemainingQuantity(launch);
         if (Model?.RequiresMaterialLotSelection == true && string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode) && launch.AvailableMaterialLots.Count == 1)
@@ -686,6 +681,11 @@
 
         ConfirmedOverLimitOrderIds.Remove(launch.OrderId);
         UpdateTotalDeclared();
+        var message = Model?.RequiresMaterialLotSelection == true
+            ? "Qta dichiarata impostata al massimo disponibile. Se necessario seleziona il lotto."
+            : "Qta dichiarata impostata al massimo disponibile.";
+        var type = Model?.RequiresMaterialLotSelection == true ? "info" : "success";
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", message, type);
     }
 
     private void OpenQuantityModal(Screen4SelectedLaunchViewModel launch)
@@ -747,9 +747,10 @@
 
         UpdateTotalDeclared();
         CloseQuantityModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Qta dichiarata aggiornata.", "success");
     }
 
-    private void ClearActiveQuantity()
+    private async Task ClearActiveQuantityAsync()
     {
         if (ActiveQuantityLaunch is not null)
         {
@@ -759,6 +760,17 @@
         }
 
         CloseQuantityModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Qta dichiarata annullata.", "info");
+    }
+
+    private async Task ClearSlotAsync(Screen4SelectedLaunchViewModel launch)
+    {
+        launch.QuantityDeclared = null;
+        launch.SelectedMaterialLotCode = string.Empty;
+        ConfirmedOverLimitOrderIds.Remove(launch.OrderId);
+        ConfirmedMissingMaterialLotOrderIds.Remove(launch.OrderId);
+        UpdateTotalDeclared();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Dati della riga annullati.", "info");
     }
 
     private void OpenMaterialLotModal(Screen4SelectedLaunchViewModel launch)
@@ -783,18 +795,22 @@
         MaterialLotChoice = string.Empty;
     }
 
-    private void ConfirmMaterialLot()
+    private async Task ConfirmMaterialLotAsync()
     {
+        if (string.IsNullOrWhiteSpace(MaterialLotChoice))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Seleziona il lotto prima di confermare.", "warning");
+            return;
+        }
+
         if (ActiveMaterialLotLaunch is not null)
         {
             ActiveMaterialLotLaunch.SelectedMaterialLotCode = MaterialLotChoice;
-            if (!string.IsNullOrWhiteSpace(MaterialLotChoice))
-            {
-                ConfirmedMissingMaterialLotOrderIds.Remove(ActiveMaterialLotLaunch.OrderId);
-            }
+            ConfirmedMissingMaterialLotOrderIds.Remove(ActiveMaterialLotLaunch.OrderId);
         }
 
         CloseMaterialLotModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Lotto aggiornato.", "success");
     }
 
     private void UpdateTotalDeclared()
@@ -836,13 +852,22 @@
         }
     }
 
-    private void ClearTiming()
+    private async Task ClearTimingAsync()
     {
         if (Model is not null)
         {
             Model.GlobalTimingHours = 0;
             Model.GlobalTimingMinutes = 0;
         }
+
+        CloseTimingModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Timing annullato.", "info");
+    }
+
+    private async Task ConfirmTimingAsync()
+    {
+        CloseTimingModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Timing aggiornato per tutti i lotti. Verrà moltiplicato per il numero di operatori in fase di inserimento.", "success");
     }
 
     private void OpenProblemModal()
@@ -852,7 +877,7 @@
             return;
         }
 
-        ProblemNoteTypeId = Model.SelectedNoteTypeId ?? Model.AvailableNoteTypes.FirstOrDefault()?.Id ?? 0;
+        ProblemNoteTypeId = Model.SelectedNoteTypeId ?? 0;
         ProblemDescription = string.Empty;
         ProblemHours = 0;
         ProblemMinutes = 0;
@@ -866,28 +891,38 @@
 
     private void ClearProblemDraft()
     {
+        ProblemNoteTypeId = Model?.SelectedNoteTypeId ?? 0;
         ProblemDescription = string.Empty;
         ProblemHours = 0;
         ProblemMinutes = 0;
     }
 
-    private void ConfirmProblemNote()
+    private async Task ClearProblemDraftAsync()
+    {
+        ClearProblemDraft();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Inserimento nota produzione o blocco annullato.", "info");
+    }
+
+    private async Task ConfirmProblemNoteAsync()
     {
         if (ProblemNoteTypeId <= 0)
         {
-            ValidationMessage = "Seleziona un tipo nota prima di confermare.";
+            ValidationMessage = "Seleziona un tipo nota prima di confermare il blocco o l'anomalia.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
         if (ProblemHours <= 0 && ProblemMinutes <= 0)
         {
             ValidationMessage = "Inserisci il timing del blocco o dell'anomalia prima di confermare.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
         if (ProblemSelectedNoteRequiresAnnotation && string.IsNullOrWhiteSpace(ProblemDescription))
         {
             ValidationMessage = "Inserisci la descrizione per la tipologia selezionata.";
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", ValidationMessage, "warning");
             return;
         }
 
@@ -901,18 +936,21 @@
         ValidationMessage = null;
         ClearProblemDraft();
         CloseProblemModal();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Nota produzione o blocco aggiunto.", "success");
     }
 
-    private void ClearProblemNotes()
+    private async Task ClearProblemNotesAsync()
     {
         ProblemNotes.Clear();
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Nota produzione o blocco rimossa.", "info");
     }
 
-    private void RemoveProblemNote(int index)
+    private async Task RemoveProblemNoteAsync(int index)
     {
         if (index >= 0 && index < ProblemNotes.Count)
         {
             ProblemNotes.RemoveAt(index);
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Nota produzione o blocco rimossa.", "info");
         }
     }
 
@@ -1151,6 +1189,11 @@
     private static string FormatTime(int hours, int minutes)
     {
         return $"{Math.Max(0, hours):00} h {Math.Max(0, minutes):00} m";
+    }
+
+    private static string FormatMinuteOption(int minutes)
+    {
+        return minutes == 0 ? "00" : minutes.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string FormatQuantity(decimal value)
