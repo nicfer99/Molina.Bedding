@@ -655,7 +655,10 @@
         && (!ProblemSelectedNoteRequiresAnnotation || !string.IsNullOrWhiteSpace(ProblemDescription));
     private int TotalTimingMinutes => Model is null ? 0 : (Model.GlobalTimingHours * 60) + Model.GlobalTimingMinutes;
     private bool IsInsertButtonHidden => Model?.IsTimingOnlyMode == true && TotalTimingMinutes <= 0;
-    private bool IsInsertButtonDisabled => Model?.IsTimingOnlyMode != true && TotalTimingMinutes <= 0;
+    private bool HasDeclaredQuantities => Model?.SelectedLaunches.Any(static launch => launch.QuantityDeclared.GetValueOrDefault() > 0m) == true;
+    private bool IsInsertButtonDisabled => Model is null
+        || (Model.IsTimingOnlyMode && TotalTimingMinutes <= 0)
+        || (!Model.IsTimingOnlyMode && (TotalTimingMinutes <= 0 || !HasDeclaredQuantities));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
