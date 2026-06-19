@@ -429,9 +429,23 @@
 
     private async Task RemoveLaunchAsync(int orderId)
     {
+        if (!SelectedOrderIds.Contains(orderId))
+        {
+            await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
+            return;
+        }
+
+        if (ActiveDirectLaunch?.OrderId == orderId)
+        {
+            CloseDirectModal();
+        }
+
         SelectedOrderIds.Remove(orderId);
         PrefillSelections.Remove(orderId);
+        BarcodeValue = string.Empty;
         await PersistSelectionAsync(false);
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", "Dati del lotto annullati.", "info");
+        await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
     }
 
     private async Task HandleLaunchCardClickAsync()
