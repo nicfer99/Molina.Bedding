@@ -128,7 +128,7 @@
                                 <div class="screen4-problem-summary screen4-problem-summary--global@(ProblemNotes.Count > 0 ? " has-problem" : string.Empty)" data-global-problem-summary="true">
                                     <span data-global-problem-summary-text="true">@GetProblemSummary()</span>
                                     <button type="button"
-                                            class="screen4-summary-clear@(ProblemNotes.Count > 0 ? string.Empty : " is-hidden")"
+                                            class="screen4-summary-clear@(ProblemNotes.Count == 1 ? string.Empty : " is-hidden")"
                                             data-clear-global-problem="true"
                                             aria-label="Rimuovi nota produzione o blocco"
                                             title="Rimuovi nota produzione o blocco"
