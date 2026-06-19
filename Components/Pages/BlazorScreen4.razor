@@ -200,6 +200,7 @@
                                                 tabindex="@(Model.RequiresMaterialLotSelection ? "0" : null)"
                                                 role="@(Model.RequiresMaterialLotSelection ? "button" : null)"
                                                 aria-label="@(Model.RequiresMaterialLotSelection ? "Apri selezione lotto per questa riga" : null)"
+                                                @onkeydown="args => HandleMaterialLotCellKeydownAsync(args, launch)"
                                                 @onclick="() => OpenMaterialLotModalAsync(launch)">
                                                 <div class="screen4-table-lot">@launch.LotCode</div>
                                                 <button type="button"
@@ -1019,6 +1020,16 @@
         }
 
         PendingFocusSelector = "#screen4MaterialLotModal .material-lot-reference-chip.is-selected, #screen4MaterialLotModal [data-material-lot-reference]";
+    }
+
+    private async Task HandleMaterialLotCellKeydownAsync(KeyboardEventArgs args, Screen4SelectedLaunchViewModel launch)
+    {
+        if (args.Key is not ("Enter" or " " or "Spacebar"))
+        {
+            return;
+        }
+
+        await OpenMaterialLotModalAsync(launch);
     }
 
     private void CloseMaterialLotModal()
