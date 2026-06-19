@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Molina.Bedding.Mvc.DataAccess;
 using Molina.Bedding.Mvc.Components;
 using Molina.Bedding.Mvc.Services;
@@ -27,6 +28,13 @@ builder.Services.AddScoped<IDeclarationDateAuthorizationService, DeclarationDate
 builder.Services.AddSingleton<IWorkMenuService, StaticWorkMenuService>();
 builder.Services.AddScoped<BlazorProductionDeclarationState>();
 builder.Services.AddScoped<IProductionDeclarationFlowService, ProductionDeclarationFlowService>();
+
+if (builder.Environment.IsDevelopment())
+{
+    var dataProtectionRepository = new InMemoryDataProtectionXmlRepository();
+    builder.Services.AddDataProtection()
+        .AddKeyManagementOptions(options => options.XmlRepository = dataProtectionRepository);
+}
 
 var app = builder.Build();
 
