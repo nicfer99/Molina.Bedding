@@ -396,7 +396,7 @@
                 <div>
                     <div class="page-kicker" data-qty-modal-kicker="true">Quantità parziale</div>
                     <h2 id="screen4QuantityModalTitle" data-qty-modal-title="true">Inserisci la quantità dichiarata</h2>
-                    <p class="screen4-qty-modal__intro" data-qty-modal-intro="true">Inserisci la qta dichiarata residua per il lotto selezionato.</p>
+                    <p class="screen4-qty-modal__intro" data-qty-modal-intro="true">Inserisci la qta dichiarata per il lotto selezionato. Se supera il residuo disponibile, ti verrà chiesta una conferma dedicata.</p>
                 </div>
                 <button type="button" class="screen4-qty-modal__close" data-close-qty-modal="true" @onclick="CloseQuantityModal" aria-label="Chiudi finestra">×</button>
             </div>
@@ -860,10 +860,11 @@
 
         ConfirmedOverLimitOrderIds.Remove(launch.OrderId);
         UpdateTotalDeclared();
-        var message = Model?.RequiresMaterialLotSelection == true
-            ? "Qta dichiarata impostata al massimo disponibile. Se necessario seleziona il lotto."
-            : "Qta dichiarata impostata al massimo disponibile.";
-        var type = Model?.RequiresMaterialLotSelection == true ? "info" : "success";
+        var hasMaterialLot = Model?.RequiresMaterialLotSelection != true || !string.IsNullOrWhiteSpace(launch.SelectedMaterialLotCode);
+        var message = hasMaterialLot
+            ? "Qta dichiarata impostata al massimo disponibile."
+            : "Qta dichiarata impostata al massimo disponibile. Se necessario seleziona il lotto.";
+        var type = hasMaterialLot ? "success" : "info";
         await JsRuntime.InvokeVoidAsync("molinaBlazorDialog.toast", message, type);
     }
 
