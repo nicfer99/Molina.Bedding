@@ -22,11 +22,7 @@
         <div class="inline-alert" role="alert">@ValidationMessage</div>
     }
 
-    @if (Model is null)
-    {
-        <div class="inline-alert">Caricamento operatori...</div>
-    }
-    else
+    @if (Model is not null)
     {
         <div id="operatorSelectionForm">
             <input type="hidden" id="SelectedOperatorIds" name="SelectedOperatorIds" value="@string.Join(",", SelectedIds.OrderBy(id => id))" />

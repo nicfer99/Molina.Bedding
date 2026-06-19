@@ -28,11 +28,7 @@
         <div class="inline-alert" role="alert">@ValidationMessage</div>
     }
 
-    @if (Model is null)
-    {
-        <div class="inline-alert">Caricamento operazione...</div>
-    }
-    else
+    @if (Model is not null)
     {
         <div id="screen4InsertForm">
             <input type="hidden" name="ActionId" value="@Model.ActionId" />

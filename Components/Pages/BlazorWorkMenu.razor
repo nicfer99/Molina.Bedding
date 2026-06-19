@@ -25,11 +25,7 @@
         </div>
     </header>
 
-    @if (Model is null)
-    {
-        <div class="inline-alert">Caricamento lavorazioni...</div>
-    }
-    else
+    @if (Model is not null)
     {
         <div class="work-area-grid work-area-grid--aligned">
             @foreach (var area in Model.Areas)

@@ -38,11 +38,7 @@
         <div class="inline-alert" role="alert">@ValidationMessage</div>
     }
 
-    @if (Model is null)
-    {
-        <div class="inline-alert">Caricamento lotti...</div>
-    }
-    else
+    @if (Model is not null)
     {
         <div id="launchSelectionForm" data-add-launch-from-barcode-url="">
             <input type="hidden" name="ActionId" value="@Model.ActionId" />
