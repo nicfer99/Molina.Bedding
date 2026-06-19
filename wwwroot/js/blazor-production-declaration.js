@@ -376,7 +376,7 @@
             var titleElement = document.createElement("div");
             titleElement.id = "appConfirmDialogTitle";
             titleElement.className = "app-confirm-dialog-title";
-            titleElement.textContent = title || "Conferma operazione";
+            titleElement.textContent = title || "Conferma inserimento";
 
             var messageElement = document.createElement("div");
             messageElement.id = "appConfirmDialogMessage";
@@ -412,14 +412,9 @@
             }
 
             function keyHandler(event) {
-                closeOnKeys(event, closeDialog, false);
+                closeOnKeys(event, closeDialog, true);
             }
 
-            overlay.addEventListener("click", function (event) {
-                if (event.target === overlay) {
-                    closeDialog(false);
-                }
-            });
             cancelButton.addEventListener("click", function () {
                 closeDialog(false);
             });
@@ -439,7 +434,7 @@
             document.body.style.overflow = "hidden";
             document.addEventListener("keydown", keyHandler);
             window.setTimeout(function () {
-                cancelButton.focus();
+                confirmButton.focus();
             }, 30);
         });
     }
