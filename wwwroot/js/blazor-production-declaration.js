@@ -47,9 +47,50 @@
         }
     };
 
+    var modalEscapeHandlers = {};
+
+    function isSelectorOpen(selector) {
+        var element = selector ? document.querySelector(selector) : null;
+        return !!element && element.hidden !== true;
+    }
+
     window.molinaBlazorModal = {
         setOpen: function (isOpen) {
             document.body.classList.toggle("screen4-modal-open", isOpen === true);
+        },
+        activateEscape: function (key, selectors, dotNetReference, methodName) {
+            var handlerKey = key || "default";
+            var modalSelectors = Array.isArray(selectors) ? selectors : [];
+            this.deactivateEscape(handlerKey);
+
+            var handler = function (event) {
+                if (event.key !== "Escape") {
+                    return;
+                }
+
+                var openSelector = modalSelectors.find(isSelectorOpen);
+                if (!openSelector) {
+                    return;
+                }
+
+                event.preventDefault();
+                if (dotNetReference && typeof dotNetReference.invokeMethodAsync === "function" && methodName) {
+                    dotNetReference.invokeMethodAsync(methodName, openSelector);
+                }
+            };
+
+            modalEscapeHandlers[handlerKey] = handler;
+            document.addEventListener("keydown", handler);
+        },
+        deactivateEscape: function (key) {
+            var handlerKey = key || "default";
+            var handler = modalEscapeHandlers[handlerKey];
+            if (!handler) {
+                return;
+            }
+
+            document.removeEventListener("keydown", handler);
+            delete modalEscapeHandlers[handlerKey];
         }
     };
 
@@ -90,14 +131,12 @@
         });
     }
 
-    function isAnySelectorPresent(selectors) {
+    function isAnySelectorOpen(selectors) {
         if (!selectors) {
             return false;
         }
 
-        return selectors.some(function (selector) {
-            return !!selector && !!document.querySelector(selector);
-        });
+        return selectors.some(isSelectorOpen);
     }
 
     window.molinaBlazorBarcode = {
@@ -129,7 +168,7 @@
 
                 document.addEventListener("keydown", function (event) {
                     var input = document.getElementById(state.inputId);
-                    if (!input || isInsideAnySelector(document.activeElement, state.blockedSelectors)) {
+                    if (!input || isAnySelectorOpen(state.blockedSelectors) || isInsideAnySelector(document.activeElement, state.blockedSelectors)) {
                         return;
                     }
 
@@ -172,7 +211,7 @@
 
                 document.addEventListener("paste", function (event) {
                     var input = document.getElementById(state.inputId);
-                    if (!input || isAnySelectorPresent(state.blockedSelectors)) {
+                    if (!input || isAnySelectorOpen(state.blockedSelectors)) {
                         return;
                     }
 

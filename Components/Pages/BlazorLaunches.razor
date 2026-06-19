@@ -372,6 +372,12 @@
             "lotBarcode",
             new[] { "#launchDirectInsertModal", "#launchDirectPartialQuantityModal" },
             BarcodeReference);
+        await JsRuntime.InvokeVoidAsync(
+            "molinaBlazorModal.activateEscape",
+            "launches",
+            new[] { "#launchDirectPartialQuantityModal", "#launchDirectInsertModal" },
+            BarcodeReference,
+            nameof(CloseLaunchModalFromEscapeAsync));
         await JsRuntime.InvokeVoidAsync("molinaBlazorDom.focusById", "lotBarcode");
         StateHasChanged();
     }
@@ -511,6 +517,22 @@
         BarcodeValue = rawBarcode ?? string.Empty;
         await AddBarcodeAsync();
         StateHasChanged();
+    }
+
+    [JSInvokable(nameof(CloseLaunchModalFromEscapeAsync))]
+    public Task CloseLaunchModalFromEscapeAsync(string? selector)
+    {
+        if (string.Equals(selector, "#launchDirectPartialQuantityModal", StringComparison.Ordinal))
+        {
+            CloseDirectPartialModal();
+        }
+        else if (string.Equals(selector, "#launchDirectInsertModal", StringComparison.Ordinal))
+        {
+            CloseDirectModal();
+        }
+
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task<bool> TryHandleLoadedBarcodeAsync(string rawBarcode)
@@ -938,6 +960,7 @@
         {
             try
             {
+                await JsRuntime.InvokeVoidAsync("molinaBlazorModal.deactivateEscape", "launches");
                 await JsRuntime.InvokeVoidAsync("molinaBlazorBarcode.deactivate", BarcodeReference);
             }
             catch (JSDisconnectedException)
