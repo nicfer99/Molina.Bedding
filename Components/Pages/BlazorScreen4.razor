@@ -561,7 +561,7 @@
                                     data-note-type-id="@noteType.Id"
                                     data-requires-annotation="@FormatBool(noteType.RequiresAnnotationText)"
                                     aria-pressed="@(isSelected ? "true" : "false")"
-                                    @onclick="() => ProblemNoteTypeId = noteType.Id">
+                                    @onclick="() => SelectProblemNoteType(noteType.Id)">
                                 @noteType.Description
                             </button>
                         }
@@ -1166,6 +1166,16 @@
         ProblemHours = 0;
         ProblemMinutes = 0;
         ShowProblemModal = true;
+    }
+
+    private void SelectProblemNoteType(int noteTypeId)
+    {
+        ProblemNoteTypeId = noteTypeId;
+        var requiresAnnotation = Model?.AvailableNoteTypes.FirstOrDefault(item => item.Id == noteTypeId)?.RequiresAnnotationText == true;
+        if (!requiresAnnotation)
+        {
+            ProblemDescription = string.Empty;
+        }
     }
 
     private void CloseProblemModal()
