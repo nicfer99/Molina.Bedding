@@ -1,13 +1,45 @@
 (function () {
+    // window.localStorage puo' lanciare (SecurityError) quando la pagina e' embeddata in un
+    // iframe cross-origin con storage di terze parti bloccato/partizionato (Chrome storage
+    // partitioning, Safari ITP). In quel caso si passa a un fallback in memoria valido per la
+    // sessione dello script corrente, cosi' il flusso Blazor Server non perde piu' silenziosamente
+    // lo stato del wizard (operatore selezionato, ecc.) e Continue non "torna indietro".
+    var memoryStorageFallback = {};
+    var useMemoryStorageFallback = false;
+
     window.molinaBlazorStorage = {
         get: function (key) {
-            return window.localStorage.getItem(key);
+            if (!useMemoryStorageFallback) {
+                try {
+                    return window.localStorage.getItem(key);
+                } catch (error) {
+                    useMemoryStorageFallback = true;
+                }
+            }
+
+            return Object.prototype.hasOwnProperty.call(memoryStorageFallback, key)
+                ? memoryStorageFallback[key]
+                : null;
         },
         set: function (key, value) {
-            window.localStorage.setItem(key, value);
+            memoryStorageFallback[key] = value;
+            if (!useMemoryStorageFallback) {
+                try {
+                    window.localStorage.setItem(key, value);
+                } catch (error) {
+                    useMemoryStorageFallback = true;
+                }
+            }
         },
         remove: function (key) {
-            window.localStorage.removeItem(key);
+            delete memoryStorageFallback[key];
+            if (!useMemoryStorageFallback) {
+                try {
+                    window.localStorage.removeItem(key);
+                } catch (error) {
+                    useMemoryStorageFallback = true;
+                }
+            }
         }
     };
 

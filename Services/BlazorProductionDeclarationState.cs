@@ -82,14 +82,29 @@ public sealed class BlazorProductionDeclarationState
             StartSuccessMessage = StartSuccessMessage
         };
 
-        await _jsRuntime.InvokeVoidAsync("molinaBlazorStorage.set", StorageKey, JsonSerializer.Serialize(snapshot));
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("molinaBlazorStorage.set", StorageKey, JsonSerializer.Serialize(snapshot));
+        }
+        catch
+        {
+            // Persistenza lato browser non riuscita (es. storage bloccato in iframe cross-origin):
+            // lo stato resta comunque valido in memoria per il circuito corrente, il flusso non deve fermarsi.
+        }
     }
 
     public async ValueTask ClearAsync()
     {
         ResetInMemory();
         _loaded = true;
-        await _jsRuntime.InvokeVoidAsync("molinaBlazorStorage.remove", StorageKey);
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("molinaBlazorStorage.remove", StorageKey);
+        }
+        catch
+        {
+            // Lo stato in memoria e' gia' stato azzerato: un errore qui non deve propagarsi.
+        }
     }
 
     public async ValueTask SetOperatorsAsync(IEnumerable<int> operatorIds)
